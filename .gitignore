@@ -1,0 +1,17 @@
+data/raw/
+data/interim/
+data/processed/
+*.tif
+*.tiff
+*.zip
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+.env
+secrets.yaml
+
+# run logs
+logs_*.txt
+_check.js

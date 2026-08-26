@@ -1,0 +1,20 @@
+{
+"type": "FeatureCollection",
+"name": "negative_control_mines",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "name": "Kamptee coal mine", "commodity": "coal", "operator": "Western Coalfields Limited", "source": "OSM landuse=quarry resource=coal", "lon": 79.2280192, "lat": 21.2425451 }, "geometry": { "type": "Point", "coordinates": [ 79.2280192, 21.2425451 ] } },
+{ "type": "Feature", "properties": { "name": "Shivpuri Coal Mine", "commodity": "coal", "operator": "Western Coalfields Limited (WCL)", "source": "OSM landuse=quarry resource=coal", "lon": 78.8851885, "lat": 22.2096686 }, "geometry": { "type": "Point", "coordinates": [ 78.8851885, 22.2096686 ] } },
+{ "type": "Feature", "properties": { "name": "Malanjkhand Copper Mine", "commodity": "copper", "operator": "Hindustan Copper Limited", "source": "OSM landuse=quarry resource=copper", "lon": 80.7107697, "lat": 22.0103196 }, "geometry": { "type": "Point", "coordinates": [ 80.7107697, 22.0103196 ] } },
+{ "type": "Feature", "properties": { "name": "Barkui Coal Mine", "commodity": "coal", "operator": "Western Coalfields Limited (WCL)", "source": "OSM landuse=quarry resource=coal", "lon": 78.6834705, "lat": 22.1977959 }, "geometry": { "type": "Point", "coordinates": [ 78.6834705, 22.1977959 ] } },
+{ "type": "Feature", "properties": { "name": "unnamed coal quarry", "commodity": "coal", "operator": "", "source": "OSM landuse=quarry resource=coal", "lon": 79.1499066, "lat": 21.272519 }, "geometry": { "type": "Point", "coordinates": [ 79.1499066, 21.272519 ] } },
+{ "type": "Feature", "properties": { "name": "Singhori coal mine", "commodity": "coal", "operator": "Western Coalfields Limited", "source": "OSM landuse=quarry resource=coal", "lon": 79.1591388, "lat": 21.272244 }, "geometry": { "type": "Point", "coordinates": [ 79.1591388, 21.272244 ] } },
+{ "type": "Feature", "properties": { "name": "Gondegaon-Ghatrohana Coal Mine", "commodity": "coal", "operator": "Western Coalfields Limited (WCL)", "source": "OSM landuse=quarry resource=coal", "lon": 79.1895711, "lat": 21.2621906 }, "geometry": { "type": "Point", "coordinates": [ 79.1895711, 21.2621906 ] } },
+{ "type": "Feature", "properties": { "name": "Inder coal mine", "commodity": "coal", "operator": "Western Coalfields Limited", "source": "OSM landuse=quarry resource=coal", "lon": 79.2071772, "lat": 21.2499022 }, "geometry": { "type": "Point", "coordinates": [ 79.2071772, 21.2499022 ] } },
+{ "type": "Feature", "properties": { "name": "Adasa Coal Mine", "commodity": "coal", "operator": "Western Coalfields Limited (WCL)", "source": "OSM landuse=quarry resource=coal", "lon": 78.9601135, "lat": 21.345495 }, "geometry": { "type": "Point", "coordinates": [ 78.9601135, 21.345495 ] } },
+{ "type": "Feature", "properties": { "name": "Urdhan Coal Mine", "commodity": "coal", "operator": "Western Coalfields Limited (WCL)", "source": "OSM landuse=quarry resource=coal", "lon": 78.9578497, "lat": 22.2756295 }, "geometry": { "type": "Point", "coordinates": [ 78.9578497, 22.2756295 ] } },
+{ "type": "Feature", "properties": { "name": "Mohan/Maurt UG and OC mine", "commodity": "coal", "operator": "Western Coalfields Limited (WCL)", "source": "OSM landuse=quarry resource=coal", "lon": 78.6785513, "lat": 22.179492 }, "geometry": { "type": "Point", "coordinates": [ 78.6785513, 22.179492 ] } },
+{ "type": "Feature", "properties": { "name": "unnamed sand quarry", "commodity": "sand", "operator": "", "source": "OSM landuse=quarry resource=sand", "lon": 80.6954935, "lat": 22.0787862 }, "geometry": { "type": "Point", "coordinates": [ 80.6954935, 22.0787862 ] } },
+{ "type": "Feature", "properties": { "name": "unnamed sand quarry", "commodity": "sand", "operator": "", "source": "OSM landuse=quarry resource=sand", "lon": 80.7338955, "lat": 22.069893 }, "geometry": { "type": "Point", "coordinates": [ 80.7338955, 22.069893 ] } }
+]
+}

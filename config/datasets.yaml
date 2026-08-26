@@ -1,0 +1,142 @@
+# Dataset registry for SIH PS 26009 - Manganese prospectivity, Madhya Pradesh
+#
+# Every acquisition script reads from this file. Change parameters here, not in code.
+# See docs/bhoonidhi-data-inventory.md for the Bhoonidhi side.
+
+project:
+  # Common analysis grid. UTM 44N covers ~78-84E; the Sausar belt sits inside it.
+  # Western MP (Jhabua, ~74E) falls in UTM 43N - handled by reprojecting to this grid.
+  crs: "EPSG:32644"
+  scale_m: 20
+  aoi_file: "config/aoi.geojson"
+
+  # Dry season only. Minimum vegetation, minimum cloud, maximum rock exposure.
+  # Window crosses the new year, so each "season" is Nov of year N to Apr of year N+1.
+  dry_season:
+    start_month_day: "11-01"
+    end_month_day: "04-30"
+    seasons: [2019, 2020, 2021, 2022, 2023, 2024, 2025]  # label = start year
+
+  # Madhya Pradesh state boundary is pulled at runtime rather than hardcoded.
+  mp_boundary:
+    source: "FAO/GAUL/2015/level1"
+    filter_field: "ADM1_NAME"
+    filter_value: "Madhya Pradesh"
+
+gee:
+  # ---------------------------------------------------------------- A1
+  sentinel2:
+    collection: "COPERNICUS/S2_SR_HARMONIZED"
+    cloud_score: "GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED"
+    cloud_score_band: "cs_cdf"
+    cloud_score_threshold: 0.60          # keep pixels at/above this clarity score
+    bands: [B2, B3, B4, B5, B6, B7, B8, B8A, B11, B12]
+    bands_10m: [B2, B3, B4, B8]          # belt AOI only
+    scale_m: 20
+    scale_factor: 0.0001                 # DN -> reflectance
+    export_dtype: int16                  # reflectance * 10000
+
+  # ---------------------------------------------------------------- A2
+  landsat:
+    collections:
+      - "LANDSAT/LC08/C02/T1_L2"
+      - "LANDSAT/LC09/C02/T1_L2"
+    optical_bands: [SR_B1, SR_B2, SR_B3, SR_B4, SR_B5, SR_B6, SR_B7]
+    thermal_bands: [ST_B10]
+    qa_band: "QA_PIXEL"
+    scale_m: 30
+    # Collection-2 L2 scaling (USGS): SR = DN*2.75e-05 - 0.2 ; ST = DN*0.00341802 + 149.0
+    sr_mult: 0.0000275
+    sr_add: -0.2
+    st_mult: 0.00341802
+    st_add: 149.0
+
+  # ---------------------------------------------------------------- A3
+  aster:
+    collection: "ASTER/AST_L1T_003"
+    vnir_bands: [B01, B02, B3N]
+    swir_bands: [B04, B05, B06, B07, B08, B09]
+    tir_bands:  [B10, B11, B12, B13, B14]
+    # HARD CONSTRAINT: the ASTER SWIR detector failed in April 2008.
+    # Any SWIR pixel after this date is garbage and would poison every band ratio.
+    swir_valid_before: "2008-04-01"
+    swir_scale_m: 30
+    vnir_scale_m: 15
+    max_cloud_pct: 20
+
+  # ---------------------------------------------------------------- A4
+  terrain:
+    primary: "COPERNICUS/DEM/GLO30_2024_1"
+    primary_band: "DEM"
+    fallback: "USGS/SRTMGL1_003"
+    fallback_band: "elevation"
+    scale_m: 30
+    hillshade_azimuths: [0, 45, 90, 135]   # multi-azimuth for lineament work
+    hillshade_elevation: 35
+
+  # ---------------------------------------------------------------- A5
+  sentinel1:
+    collection: "COPERNICUS/S1_GRD"
+    instrument_mode: "IW"
+    polarisations: [VV, VH]
+    orbit_passes: [ASCENDING, DESCENDING]   # kept separate, never mixed
+    scale_m: 20
+
+  # ---------------------------------------------------------------- A6  (shortfall model)
+  climate:
+    rainfall:      { collection: "UCSB-CHG/CHIRPS/DAILY",        band: "precipitation" }
+    lst:           { collection: "MODIS/061/MOD11A2",            bands: [LST_Day_1km, LST_Night_1km] }
+    soil_moisture: { collection: "NASA/SMAP/SPL4SMGP/007",       bands: [sm_surface, sm_rootzone] }
+    era5:          { collection: "ECMWF/ERA5_LAND/DAILY_AGGR",   bands: [total_precipitation_sum, temperature_2m, volumetric_soil_water_layer_1] }
+    start_date: "2015-01-01"
+
+  export:
+    drive_folder: "SIH26009_MN_MP"
+    max_pixels: 1e13
+    tile_degrees: 1.0            # statewide exports are cut into 1 deg x 1 deg blocks
+    file_format: "GeoTIFF"
+
+# -------------------------------------------------------------------- Part B
+bhoonidhi:
+  endpoint: "https://bhoonidhi.nrsc.gov.in/bhoonidhi/ProductSearch"
+  page_size: 500                 # server-fixed
+  max_sensors_per_search: 10     # server-enforced
+  open_data_cart_cap: 1000
+  # CLOUD filter is binary only: "1" = 0-10% cloud, "0" = any. No numeric threshold exists.
+  cloud_filter_low: "1"
+
+  products:
+    - { key: "CartoSat-1_PAN_CartoDEM-30m",            priority: high,   aoi: mp_bbox }
+    - { key: "ResourceSat-2_LISS3_BOA-Archives",       priority: high,   aoi: belt_sausar }
+    - { key: "ResourceSat-2A_LISS3_BOA-Archives",      priority: high,   aoi: belt_sausar }
+    - { key: "ResourceSat-2_LISS4(MX70)_L2",           priority: medium, aoi: belt_sausar }
+    - { key: "ResourceSat-2A_LISS4(MX70)_L2",          priority: medium, aoi: belt_sausar }
+    - { key: "EOS-04_SAR(MRS)_L2B",                    priority: medium, aoi: belt_sausar }
+    - { key: "EOS-04_SAR(MRS)_SoilMoisture",           priority: medium, aoi: mp_bbox }
+    - { key: "EOS-04_SAR(MRS)_WaterSpread",            priority: low,    aoi: belt_sausar }
+
+  # Regression check - these were measured live on 2026-08-25 over mp_bbox,
+  # 01-NOV-2024 to 30-APR-2025. src/bhoonidhi/search.py verifies against them.
+  reference_counts:
+    window: { start: "NOV/1/2024", end: "APR/30/2025" }
+    sentinel2_l2a_any_cloud: 4575
+    sentinel2_l2a_low_cloud: 2964
+    landsat_8_9_l1: 953
+    liss4_mx70_l2: 968
+    sentinel1_grd: 519
+    liss3_boa: 509
+    awifs_boa: 499
+    eos04_soil_moisture: 369
+    cartodem_30m: 54
+
+# -------------------------------------------------------------------- Part C
+validation:
+  # HELD OUT. Nothing under data/validation/ may be read by training code.
+  dir: "data/validation"
+  occurrences_file: "known_mn_occurrences.geojson"
+  pit_footprints_file: "active_mine_footprints.geojson"
+  halos_file: "validation_halos.geojson"
+  halo_inner_m: 500       # exclude the pit itself - bare excavated ground is not geology
+  halo_outer_m: 2000
+  n_background_points: 10000
+  random_seed: 26009
