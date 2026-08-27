@@ -22,7 +22,7 @@ const CommandMap = dynamic(() => import("@/components/CommandMap"), { ssr: false
 
 export default function Home() {
   const [workspace, setWorkspace] = useState<"explore" | "protect">("explore");
-  const { status, error, manifest, targets, mines, validation } = useOreCompassData();
+  const { status, error, manifest, targets, mines, validation, terrain } = useOreCompassData();
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
@@ -39,7 +39,7 @@ export default function Home() {
           }}
         >
           {status === "ready" && manifest && targets && mines ? (
-            <CommandMap manifest={manifest} targets={targets} mines={mines} />
+            <CommandMap manifest={manifest} targets={targets} mines={mines} terrain={terrain} />
           ) : (
             <div
               style={{
