@@ -107,26 +107,22 @@ export default function CesiumCutaway() {
 
         const { lat, lon, surfaceAltitude, depthMeters, bottomAltitude } = BALAGHAT_GEO;
 
-        // Create Cesium Viewer. No Cesium ion access token is configured anywhere in this
-        // project (deliberately - MapLibre was picked for the 2D map for the same reason:
-        // "no API token needed"), so the default imagery/terrain providers - which fetch
-        // Cesium World Imagery/Terrain via ion - fail repeatedly and trip Cesium's own
-        // "Rendering has stopped" safety halt.
+        // Create Cesium Viewer. No baseLayer override - Cesium falls back to its own
+        // shipped-in-the-package demo ion access token, which serves real Cesium World
+        // Imagery (visible satellite imagery, not a plain color or a stand-in relief map)
+        // well enough for evaluation/demo use. Cesium prints its own "assign your own ion
+        // token" notice at the bottom of the viewer - that's an informational nag about the
+        // shared demo token's limits for production use, not an error; it does not block
+        // rendering. Get a free personal ion token (cesium.com) before any real deployment.
         //
-        // Tried CARTO's raster Dark Matter tiles first (same CDN as CommandMap.tsx's
-        // MapLibre basemap) - turns out CARTO's classic raster tile endpoint
-        // (basemaps.cartocdn.com/dark_all/...) now requires an API key, unlike the vector
-        // style JSON the 2D map uses; tiles loaded but rendered as an "API KEY REQUIRED"
-        // watermark. Then tried plain OpenStreetMap tiles (genuinely free/keyless, real
-        // render) - but a street map with roads/place labels doesn't suit a geology app.
-        // Esri's World_Terrain_Base is a free, tokenless ArcGIS basemap (no roads/labels,
-        // shaded-relief/hypsometric terrain styling) - the right fit for a mine-depth
-        // cutaway, and Cesium ships a dedicated provider for it.
-        const worldTerrainBase = await Cesium.ArcGisMapServerImageryProvider.fromUrl(
-          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer",
-        );
+        // Earlier attempts to avoid ion entirely (CARTO raster - now requires its own API
+        // key; OpenStreetMap - free but a street map doesn't suit a geology app; Esri
+        // World_Terrain_Base - free relief shading, no satellite detail) turned out to be
+        // solving the wrong problem. The actual cause of the original "Rendering has
+        // stopped" crash was Cesium's own static assets (Workers/Assets/ThirdParty) never
+        // being copied to public/cesium/ (see scripts/copy-cesium-assets.mjs) - once that
+        // was fixed, the default ion imagery works cleanly with no other changes needed.
         const viewer = new Cesium.Viewer(containerRef.current, {
-          baseLayer: new Cesium.ImageryLayer(worldTerrainBase),
           baseLayerPicker: false,
           geocoder: false,
           homeButton: false,
