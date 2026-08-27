@@ -1,5 +1,7 @@
 // The horizontal scrolling row of ranked-target cards, echoing the job-card rail in the UI
 // reference: one card per target, a ScoreRing standing in for their "match %".
+// Accepts onSelect / selectedRank from page.tsx to wire the Evidence+Validation drawer
+// (docs/issues/03-evidence-validation-panels.md).
 
 import type { CSSProperties } from "react";
 import GlassCard from "./GlassCard";
@@ -12,7 +14,15 @@ function scoreBand(score: number): string {
   return "Marginal";
 }
 
-export default function TargetRail({ targets }: { targets: FeatureCollectionLike }) {
+export default function TargetRail({
+  targets,
+  selectedRank,
+  onSelect,
+}: {
+  targets: FeatureCollectionLike;
+  selectedRank: number | null;
+  onSelect: (rank: number) => void;
+}) {
   const sorted = [...targets.features]
     .map((f) => f.properties as unknown as TargetProperties)
     .sort((a, b) => a.rank - b.rank);
@@ -36,7 +46,15 @@ export default function TargetRail({ targets }: { targets: FeatureCollectionLike
             display: "flex",
             flexDirection: "column",
             gap: 10,
+            cursor: "pointer",
+            outline:
+              selectedRank === t.rank
+                ? "2px solid var(--accent-lime)"
+                : "2px solid transparent",
+            outlineOffset: 2,
+            transition: "outline-color 0.15s",
           }}
+          onClick={() => onSelect(t.rank)}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
