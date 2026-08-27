@@ -13,6 +13,15 @@ export interface LayerManifest {
   value_range: [number, number];
 }
 
+export interface TerrainData {
+  width: number;
+  height: number;
+  bounds: LatLonBounds;
+  min: number;
+  max: number;
+  data: string;
+}
+
 export interface Manifest {
   generated_at: string;
   aoi: string;

@@ -25,7 +25,7 @@ const CommandMap = dynamic(() => import("@/components/CommandMap"), { ssr: false
 export default function Home() {
   const [workspace, setWorkspace] = useState<"explore" | "protect">("explore");
   const [selectedRank, setSelectedRank] = useState<number | null>(null);
-  const { status, error, manifest, targets, mines, validation } = useOreCompassData();
+  const { status, error, manifest, targets, mines, validation, terrain } = useOreCompassData();
 
   // Derive the selected target's properties for the drawer
   const selectedTarget: TargetProperties | null =
@@ -55,7 +55,7 @@ export default function Home() {
           }}
         >
           {status === "ready" && manifest && targets && mines ? (
-            <CommandMap manifest={manifest} targets={targets} mines={mines} />
+            <CommandMap manifest={manifest} targets={targets} mines={mines} terrain={terrain} />
           ) : (
             <div
               style={{
