@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import "cesium/Build/Cesium/Widgets/widgets.css";
+import { Copy, Box, ArrowDown, ArrowLeft, Layers, TriangleAlert, Camera } from "lucide-react";
 import GlassCard from "./GlassCard";
 import Link from "next/link";
 
@@ -160,7 +161,10 @@ export default function CesiumCutaway() {
             heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
           },
           label: {
-            text: `Balaghat Mine Collar (Bharveli)\n📍 ${lat.toFixed(4)}° N, ${lon.toFixed(4)}° E\n⛰️ Surface Altitude: +${surfaceAltitude.toFixed(1)} m ASL`,
+            // Cesium renders this to a bitmap billboard, not the DOM - no React icon can
+            // appear here, so it stays plain text (see the deck.gl TextLayer note in
+            // CommandMap.tsx for the same constraint).
+            text: `Balaghat Mine Collar (Bharveli)\n${lat.toFixed(4)}° N, ${lon.toFixed(4)}° E\nSurface Altitude: +${surfaceAltitude.toFixed(1)} m ASL`,
             font: "12px system-ui, sans-serif",
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
             fillColor: Cesium.Color.fromCssColorString("#edefe7"),
@@ -372,9 +376,9 @@ export default function CesiumCutaway() {
                   type="button"
                   onClick={() => copyToClipboard(BALAGHAT_GEO.lon.toFixed(6), "Longitude")}
                   title="Copy Longitude"
-                  style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 11, padding: 0 }}
+                  style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, display: "flex" }}
                 >
-                  📋
+                  <Copy size={12} />
                 </button>
               </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
@@ -405,9 +409,9 @@ export default function CesiumCutaway() {
                   type="button"
                   onClick={() => copyToClipboard(BALAGHAT_GEO.lat.toFixed(6), "Latitude")}
                   title="Copy Latitude"
-                  style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 11, padding: 0 }}
+                  style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, display: "flex" }}
                 >
-                  📋
+                  <Copy size={12} />
                 </button>
               </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
@@ -441,9 +445,9 @@ export default function CesiumCutaway() {
                   type="button"
                   onClick={() => copyToClipboard(`+${BALAGHAT_GEO.surfaceAltitude.toFixed(1)} m ASL`, "Surface Altitude")}
                   title="Copy Surface Altitude"
-                  style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 11, padding: 0 }}
+                  style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, display: "flex" }}
                 >
-                  📋
+                  <Copy size={12} />
                 </button>
               </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
@@ -474,9 +478,9 @@ export default function CesiumCutaway() {
                   type="button"
                   onClick={() => copyToClipboard(`${BALAGHAT_GEO.bottomAltitude.toFixed(1)} m BSL`, "Bottom Altitude")}
                   title="Copy Bottom Altitude"
-                  style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 11, padding: 0 }}
+                  style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, display: "flex" }}
                 >
-                  📋
+                  <Copy size={12} />
                 </button>
               </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: "var(--accent-lime)", fontFamily: "monospace" }}>
@@ -505,7 +509,7 @@ export default function CesiumCutaway() {
                 cursor: "pointer",
               }}
             >
-              📐 Isometric
+              <Box size={12} style={{ marginRight: 4, verticalAlign: -2 }} />Isometric
             </button>
             <button
               type="button"
@@ -522,7 +526,7 @@ export default function CesiumCutaway() {
                 cursor: "pointer",
               }}
             >
-              ⬇️ Top Collar
+              <ArrowDown size={12} style={{ marginRight: 4, verticalAlign: -2 }} />Top Collar
             </button>
             <button
               type="button"
@@ -539,7 +543,7 @@ export default function CesiumCutaway() {
                 cursor: "pointer",
               }}
             >
-              🚇 Deep Level
+              <Layers size={12} style={{ marginRight: 4, verticalAlign: -2 }} />Deep Level
             </button>
           </div>
 
@@ -555,7 +559,8 @@ export default function CesiumCutaway() {
               lineHeight: 1.35,
             }}
           >
-            ⚠️ <strong>Illustrative depth callout:</strong> Visualises sourced vertical depth only.
+            <TriangleAlert size={12} style={{ marginRight: 4, verticalAlign: -2 }} />
+            <strong>Illustrative depth callout:</strong> Visualises sourced vertical depth only.
             Not an engineering mine plan.
           </div>
         </GlassCard>
@@ -584,7 +589,7 @@ export default function CesiumCutaway() {
           pointerEvents: "none",
         }}
       >
-        <span style={{ color: "var(--accent-lime)", fontSize: 13 }}>📷</span>
+        <Camera size={13} color="var(--accent-lime)" />
         <span>
           VIEWER ALTITUDE: <strong style={{ color: "var(--accent-lime)" }}>{cameraTelemetry.alt} m ASL</strong>
         </span>
@@ -615,7 +620,7 @@ export default function CesiumCutaway() {
             boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
           }}
         >
-          ← Back to Map View
+          <ArrowLeft size={13} /> Back to Map View
         </Link>
       </div>
 

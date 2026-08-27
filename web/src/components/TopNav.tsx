@@ -29,7 +29,11 @@ export default function TopNav({
         gap: 20,
       }}
     >
-      <Link href="/" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+      <Link
+        href="/projects"
+        title="Back to projects"
+        style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element -- fixed-size static
             wordmark icon, not worth next/image's responsive-loading machinery */}
         <img src="/logo.png" alt="" width={24} height={24} style={{ borderRadius: 6 }} />
@@ -48,7 +52,7 @@ export default function TopNav({
         }}
       >
         <Link
-          href="/"
+          href="/atlas"
           onClick={() => onWorkspaceChange("explore")}
           style={{
             textDecoration: "none",

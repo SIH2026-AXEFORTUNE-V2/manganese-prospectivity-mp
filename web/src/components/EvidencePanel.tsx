@@ -4,6 +4,7 @@
 // The fusion-weights caveat is mandatory copy — don't drop it for looking nicer.
 
 import type { CSSProperties } from "react";
+import { TriangleAlert } from "lucide-react";
 import GlassCard from "./GlassCard";
 import ScoreRing from "./ScoreRing";
 import type { TargetProperties } from "@/lib/contract";
@@ -35,7 +36,7 @@ export default function EvidencePanel({ target }: { target: TargetProperties }) 
             alignItems: "flex-start",
           }}
         >
-          <span style={{ fontSize: 16 }}>⚠️</span>
+          <TriangleAlert size={16} color="var(--warn)" style={{ flexShrink: 0, marginTop: 1 }} />
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: "var(--warn)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
               Near non-Mn mine

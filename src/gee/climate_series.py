@@ -41,23 +41,72 @@ def _sites_from_geojson(path: Path) -> ee.FeatureCollection:
     return ee.FeatureCollection(features)
 
 
-def _reduce_series(
+# Earth Engine aborts a collection query past ~5000 accumulated elements. One
+# reduceRegions per image per site multiplies fast: CHIRPS daily over three years
+# is ~1100 images, which across 9 mines is ~10k features and fails outright.
+EE_ELEMENT_CAP = 4000
+
+
+def _reduce_window(
     collection: ee.ImageCollection,
     bands: list[str],
     sites: ee.FeatureCollection,
     reducer: ee.Reducer,
 ) -> list[dict]:
-    """Per-image, per-site zonal mean. Returned as plain dicts for pandas."""
-
     def per_image(img: ee.Image) -> ee.FeatureCollection:
+        # setOutputs is required, not cosmetic. reduceRegions names its output
+        # after the BAND when several bands are reduced, but after the REDUCER
+        # ("mean") when there is only one - so single-band products like CHIRPS
+        # silently came back as an all-NaN column keyed on the band name.
         stats = img.select(bands).reduceRegions(
-            collection=sites, reducer=reducer, scale=1000
+            collection=sites, reducer=reducer.setOutputs(bands), scale=1000
         )
         date = img.date().format("YYYY-MM-dd")
         return stats.map(lambda f: f.set("date", date).setGeometry(None))
 
-    flat = collection.map(per_image).flatten()
-    return flat.getInfo()["features"]
+    return collection.map(per_image).flatten().getInfo()["features"]
+
+
+def _reduce_series(
+    collection: ee.ImageCollection,
+    bands: list[str],
+    sites: ee.FeatureCollection,
+    reducer: ee.Reducer,
+    start: str,
+    end: str,
+    n_sites: int,
+) -> list[dict]:
+    """Per-image, per-site zonal mean, chunked to stay under the element cap.
+
+    Chunk width is derived from the actual image count rather than guessed, so a
+    3-hourly product (SMAP) and a daily one (CHIRPS) both work without tuning.
+    """
+    total = collection.size().getInfo()
+    if total == 0:
+        return []
+
+    per_chunk_images = max(1, EE_ELEMENT_CAP // max(n_sites, 1))
+    n_chunks = max(1, -(-total // per_chunk_images))
+
+    begin, finish = pd.Timestamp(start), pd.Timestamp(end)
+    edges = pd.date_range(begin, finish, periods=n_chunks + 1)
+
+    out: list[dict] = []
+    for i in range(n_chunks):
+        lo = edges[i].strftime("%Y-%m-%d")
+        # filterDate's end is exclusive, so the next chunk starts exactly here.
+        # Adding a day instead would double-count the boundary date.
+        hi = edges[i + 1].strftime("%Y-%m-%d")
+        if i == n_chunks - 1:
+            hi = (edges[i + 1] + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+        window = collection.filterDate(lo, hi)
+        try:
+            out.extend(_reduce_window(window, bands, sites, reducer))
+        except ee.EEException as exc:
+            print(f"      chunk {lo}..{hi} failed: {str(exc)[:80]}")
+        if n_chunks > 1:
+            print(f"      chunk {i + 1}/{n_chunks} ({lo}) -> {len(out)} rows", flush=True)
+    return out
 
 
 def _to_frame(features: list[dict], value_cols: list[str]) -> pd.DataFrame:
@@ -99,7 +148,8 @@ def export_series(sites: ee.FeatureCollection, start: str, end: str, out: Path) 
                 print(f"    no images in range - skipped")
                 continue
             print(f"    {n} images, reducing...")
-            features = _reduce_series(collection, bands, sites, reducer)
+            n_sites = sites.size().getInfo()
+            features = _reduce_series(collection, bands, sites, reducer, start, end, n_sites)
             frame = _to_frame(features, bands)
             path = out / f"{name}.csv"
             frame.to_csv(path, index=False)
