@@ -670,13 +670,21 @@ export default function CommandMap({
       {/* MapLibre Canvas Container */}
       <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
 
-      {/* SEPARATE COLUMNS LOCATION INSPECTOR PANEL (Top-Left under Headline) */}
+      {/* SEPARATE COLUMNS LOCATION INSPECTOR PANEL (Top-Left under Headline).
+          top/bottom are both set (not just top) so this is a bounded, scrollable box rather
+          than a height driven purely by content - the hero "Where to survey next" GlassCard
+          above this lives in page.tsx (a different component), so there's no way to measure
+          its real rendered height here; `top: 170` clears it with margin instead of guessing
+          its exact pixel height, and `bottom` stops well clear of the coordinate HUD badge
+          and TargetRail below regardless of how many quick-pick buttons wrap onto new lines. */}
       <div
         style={{
           position: "absolute",
-          top: 130, // Below "Where to survey next" GlassCard
+          top: 170,
           left: 20,
+          bottom: 225,
           maxWidth: 380,
+          overflowY: "auto",
           zIndex: 10,
           display: "flex",
           flexDirection: "column",
@@ -884,11 +892,14 @@ export default function CommandMap({
         </div>
       </div>
 
-      {/* Live Longitude & Latitude HUD Badge (Bottom-Left above target rail) */}
+      {/* Live Longitude & Latitude HUD Badge (Bottom-Left above target rail).
+          bottom: 180 clears TargetRail's ~140px card height (positioned at bottom: 20) with
+          a real margin, not a guess that happened to be short - see the Location Inspector
+          panel above for why "goes right under the previous thing" offsets keep breaking. */}
       <div
         style={{
           position: "absolute",
-          bottom: 120, // Above TargetRail
+          bottom: 180,
           left: 20,
           zIndex: 10,
           display: "flex",
@@ -921,14 +932,21 @@ export default function CommandMap({
         </span>
       </div>
 
-      {/* Map Control Floating Card (Top Center / Right) */}
+      {/* Map Control Floating Card - top-center, deliberately not positioned relative to
+          the right-side panel. It used to be `right: 250` ("beside the stat cards"), which
+          broke the moment DetailDrawer (360px wide) replaced StatCards (210px wide) in that
+          same slot - the two components have no way to know about each other's width. Top-
+          center has no such coupling: it stays clear of both the left column (hero card +
+          location inspector, capped at maxWidth 380) and whatever's on the right. */}
       <div
         style={{
           position: "absolute",
           top: 20,
-          right: 250, // Beside the stat cards
+          left: "50%",
+          transform: "translateX(-50%)",
           display: "flex",
           flexDirection: "column",
+          alignItems: "center",
           gap: 8,
           zIndex: 10,
         }}
