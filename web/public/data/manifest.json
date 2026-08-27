@@ -2,19 +2,19 @@
   "generated_at": "2026-08-27T06:58:21+00:00",
   "aoi": "belt_sausar",
   "bounds": [
-    78.300206,
+    78.280991,
     21.278257,
-    80.899986,
+    80.900694,
     22.322615
   ],
   "layers": {
     "fused": {
-      "static_image": "score_fused.png",
-      "tiles": null,
+      "static_image": null,
+      "tiles": "/tiles/fused/{z}/{x}/{y}.png",
       "bounds": [
-        78.300206,
+        78.280991,
         21.278257,
-        80.899986,
+        80.900694,
         22.322615
       ],
       "value_range": [
@@ -23,12 +23,12 @@
       ]
     },
     "signature": {
-      "static_image": "score_signature.png",
-      "tiles": null,
+      "static_image": null,
+      "tiles": "/tiles/signature/{z}/{x}/{y}.png",
       "bounds": [
-        78.300206,
+        78.280991,
         21.278257,
-        80.899986,
+        80.900694,
         22.322615
       ],
       "value_range": [
@@ -37,12 +37,12 @@
       ]
     },
     "anomaly": {
-      "static_image": "score_anomaly.png",
-      "tiles": null,
+      "static_image": null,
+      "tiles": "/tiles/anomaly/{z}/{x}/{y}.png",
       "bounds": [
-        78.300206,
+        78.280991,
         21.278257,
-        80.899986,
+        80.900694,
         22.322615
       ],
       "value_range": [
