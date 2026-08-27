@@ -5,6 +5,7 @@
 // writes an *explicit* choice once the person clicks it.
 
 import { useEffect, useState } from "react";
+import { Moon, Sun } from "lucide-react";
 
 type Choice = "light" | "dark";
 
@@ -42,10 +43,9 @@ export default function ThemeToggle() {
         display: "grid",
         placeItems: "center",
         cursor: "pointer",
-        fontSize: 15,
       }}
     >
-      {choice === "dark" ? "☾" : "☀"}
+      {choice === "dark" ? <Moon size={15} /> : <Sun size={15} />}
     </button>
   );
 }

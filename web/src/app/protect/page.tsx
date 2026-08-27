@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { TriangleAlert } from "lucide-react";
 import TopNav from "@/components/TopNav";
 import { useOreCompassData } from "@/lib/useOreCompassData";
 import MinePortfolioGrid from "@/components/MinePortfolioGrid";
@@ -49,8 +50,8 @@ export default function ProtectLane() {
                 background: "color-mix(in srgb, var(--warn) 10%, transparent)",
               }}
             >
-              <div style={{ fontSize: 12, color: "var(--warn)", fontWeight: 600 }}>
-                ⚠️ Rule-based signal, not a trained forecast
+              <div style={{ fontSize: 12, color: "var(--warn)", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                <TriangleAlert size={13} /> Rule-based signal, not a trained forecast
               </div>
             </GlassCard>
           </div>

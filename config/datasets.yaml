@@ -86,7 +86,7 @@ gee:
   climate:
     rainfall:      { collection: "UCSB-CHG/CHIRPS/DAILY",        band: "precipitation" }
     lst:           { collection: "MODIS/061/MOD11A2",            bands: [LST_Day_1km, LST_Night_1km] }
-    soil_moisture: { collection: "NASA/SMAP/SPL4SMGP/007",       bands: [sm_surface, sm_rootzone] }
+    soil_moisture: { collection: "NASA/SMAP/SPL4SMGP/008",       bands: [sm_surface, sm_rootzone] }
     era5:          { collection: "ECMWF/ERA5_LAND/DAILY_AGGR",   bands: [total_precipitation_sum, temperature_2m, volumetric_soil_water_layer_1] }
     start_date: "2015-01-01"
 

@@ -32,12 +32,15 @@ export default function DetailDrawer({
         position: "absolute",
         top: 20,
         right: 20,
-        bottom: 20,
+        // 225, not 20 - leaves room for TargetRail (CommandMap.tsx's coordinate HUD badge
+        // and the Location Inspector panel on the left use the same 220-225 reservation, so
+        // every floating panel stops clear of the rail at the same line instead of each
+        // guessing its own).
+        bottom: 225,
         width: 360,
         display: "flex",
         flexDirection: "column",
         gap: 0,
-        // Stack above StatCards (which are also top-right but only ~210px wide)
         zIndex: 10,
         // Slide in from the right
         animation: "drawerSlideIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both",
