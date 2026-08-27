@@ -27,11 +27,53 @@ setWorkerUrl("/maplibre-gl-worker.mjs");
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import type { Layer } from "@deck.gl/core";
 import { BitmapLayer, GeoJsonLayer } from "@deck.gl/layers";
-import type { Manifest, FeatureCollectionLike } from "@/lib/contract";
+import { TileLayer } from "@deck.gl/geo-layers";
+import type { Manifest, LayerManifest, FeatureCollectionLike } from "@/lib/contract";
 
 // CARTO's free, keyless dark vector basemap - matches the UI reference's dark hero.
 // Swap for a Mapbox/MapTiler style later if the team gets a token; nothing else changes.
 const BASEMAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+
+// Picks tiles when available, falls back to a single draped image otherwise. Never returns
+// null silently without a reason - a layer manifest with neither field set is a data bug,
+// not a "just don't draw anything" case, so it's worth being able to grep the console for.
+function buildScoreLayer(layer: LayerManifest | undefined): Layer | null {
+  if (!layer) return null;
+
+  if (layer.tiles) {
+    // layer.tiles is already an absolute path template, e.g. "/tiles/fused/{z}/{x}/{y}.png"
+    // (docs/04-data-contract.md) - don't prefix it again here.
+    return new TileLayer({
+      id: "score-fused-tiles",
+      data: layer.tiles,
+      minZoom: 0,
+      maxZoom: 19,
+      tileSize: 256,
+      opacity: 0.8,
+      renderSubLayers: (props) => {
+        const { boundingBox } = props.tile;
+        const [[west, south], [east, north]] = boundingBox as [[number, number], [number, number]];
+        return new BitmapLayer(props, {
+          data: undefined,
+          image: props.data,
+          bounds: [west, south, east, north],
+        });
+      },
+    });
+  }
+
+  if (layer.static_image) {
+    return new BitmapLayer({
+      id: "score-fused",
+      image: `/data/${layer.static_image}`,
+      bounds: layer.bounds,
+      opacity: 0.8,
+    });
+  }
+
+  console.warn("score layer has neither `tiles` nor `static_image` - nothing to draw", layer);
+  return null;
+}
 
 export default function CommandMap({
   manifest,
@@ -68,20 +110,13 @@ export default function CommandMap({
       const fused = manifest.layers.fused;
       const layers: Layer[] = [];
 
-      // The fused score, draped as a plain image today. Once Seat 3 ships real XYZ tiles
-      // (see docs/04-data-contract.md - `tiles` becomes non-null), replace this BitmapLayer
-      // with a deck.gl TileLayer reading `fused.tiles`. Nothing else on this page changes,
-      // which is the entire point of freezing the contract first.
-      if (fused?.static_image) {
-        layers.push(
-          new BitmapLayer({
-            id: "score-fused",
-            image: `/data/${fused.static_image}`,
-            bounds: fused.bounds,
-            opacity: 0.8,
-          }),
-        );
-      }
+      // Seat 3 now ships real XYZ tiles for belt_sausar (docs/issues/01-statewide-tiling.md) -
+      // `fused.tiles` is a "/tiles/fused/{z}/{x}/{y}.png" template. `static_image` stays as
+      // the fallback for any AOI that hasn't been tiled yet (e.g. a quick local run), so this
+      // never silently shows nothing the way it did the moment the contract's static_image
+      // went null with no tile path wired up to replace it.
+      const scoreLayer = buildScoreLayer(fused);
+      if (scoreLayer) layers.push(scoreLayer);
 
       layers.push(
         new GeoJsonLayer({
