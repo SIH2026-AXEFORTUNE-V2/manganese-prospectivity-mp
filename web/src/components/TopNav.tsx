@@ -80,10 +80,11 @@ export default function TopNav({
         >
           Balaghat Cutaway (3D)
         </Link>
-        <button
-          type="button"
+        <Link
+          href="/protect"
           onClick={() => onWorkspaceChange("protect")}
           style={{
+            textDecoration: "none",
             border: "none",
             borderRadius: 999,
             padding: "8px 18px",
@@ -93,10 +94,11 @@ export default function TopNav({
             background: !isCutaway && workspace === "protect" ? "var(--accent-lime)" : "transparent",
             color: !isCutaway && workspace === "protect" ? "var(--chip-dark)" : "var(--ink)",
             transition: "all 0.18s ease",
+            display: "inline-block",
           }}
         >
           Protect
-        </button>
+        </Link>
       </div>
 
       <ThemeToggle />

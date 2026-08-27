@@ -107,8 +107,17 @@ export default function CesiumCutaway() {
 
         const { lat, lon, surfaceAltitude, depthMeters, bottomAltitude } = BALAGHAT_GEO;
 
-        // Create Cesium Viewer
+        // Create Cesium Viewer. No Cesium ion access token is configured anywhere in this
+        // project (deliberately - MapLibre was picked for the 2D map for the same reason:
+        // "no API token needed"), so the default imagery/terrain providers - which fetch
+        // Cesium World Imagery/Terrain via ion - fail repeatedly and trip Cesium's own
+        // "Rendering has stopped" safety halt. `baseLayer: false` skips fetching any
+        // imagery at all; the globe renders as the solid `baseColor` set below, which
+        // suits this view anyway - it's a stylized illustrative cutaway, not a photoreal
+        // globe. Terrain is left unset, which defaults to Cesium's token-free
+        // EllipsoidTerrainProvider.
         const viewer = new Cesium.Viewer(containerRef.current, {
+          baseLayer: false,
           baseLayerPicker: false,
           geocoder: false,
           homeButton: false,

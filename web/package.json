@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "node scripts/copy-cesium-assets.mjs"
   },
   "dependencies": {
     "@deck.gl/aggregation-layers": "^9.3.10",

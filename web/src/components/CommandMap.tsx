@@ -184,6 +184,14 @@ function buildScoreLayer(layer: LayerManifest | undefined): Layer | null {
       maxZoom: 19,
       tileSize: 256,
       opacity: 0.8,
+      // The belt is an irregular polygon, not a rectangle - build_tiles.py only generates
+      // PNGs for tiles that actually intersect it (src.dashboard.build_tiles's
+      // _iter_intersecting_tiles), so any tile at the viewport's edge that falls outside the
+      // belt legitimately 404s. That's expected, not a bug - swallow it here instead of
+      // letting it surface as an unhandled rejection Next's dev overlay treats as a crash.
+      onTileError: (err: unknown) => {
+        console.debug("score tile outside belt coverage (expected):", err);
+      },
       renderSubLayers: (props) => {
         const { boundingBox } = props.tile;
         const [[west, south], [east, north]] = boundingBox as [[number, number], [number, number]];
