@@ -14,12 +14,13 @@
 
 import { useMemo, useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronRight, X } from "lucide-react";
+import { Boxes, Check, ChevronRight, FlaskConical, Hammer, Info, Layers, X } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import GlassCard from "@/components/GlassCard";
 import RequireSession from "@/components/RequireSession";
 import ProjectSummarySidebar from "@/components/ProjectSummarySidebar";
 import SchedulePreviewPanel from "@/components/SchedulePreviewPanel";
+import PageBackgroundArt from "@/components/PageBackgroundArt";
 import { useOreCompassData } from "@/lib/useOreCompassData";
 import { createProject, useSession } from "@/lib/projectStore";
 import { deriveZones, leasePresets } from "@/lib/aiZones";
@@ -119,7 +120,10 @@ function NewProjectWizard() {
   }
 
   return (
-    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", position: "relative" }}>
+      <PageBackgroundArt />
+
+      <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", flex: 1 }}>
       <AppHeader crumbs={[{ label: "Projects", href: "/projects" }, { label: "New project" }]} />
 
       <main style={{ flex: 1, padding: "0 28px 32px", display: "flex", flexDirection: "column", gap: 18 }}>
@@ -349,13 +353,17 @@ function NewProjectWizard() {
 
                     <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 1fr) minmax(120px, 1fr) minmax(200px, 1.7fr)", gap: 10 }}>
                       <label style={labelStyle}>
-                        Target tonnes
-                        <input type="number" value={tonnes} onChange={(e) => setTonnes(e.target.value)} style={inputStyle} />
+                        <FieldLabel title="How much ore must come out of the ground in this period.">Target tonnes</FieldLabel>
+                        <IconField icon={<Boxes size={14} />} suffix="tonnes">
+                          <input type="number" value={tonnes} onChange={(e) => setTonnes(e.target.value)} style={bareInput} />
+                        </IconField>
                         <span style={hintStyle}>Avg {(Number(tonnes) / Math.max(1, Number(periodDays) || 1)).toFixed(1)} t/day</span>
                       </label>
                       <label style={labelStyle}>
-                        Required grade (% Mn)
-                        <input type="number" value={gradePct} onChange={(e) => setGradePct(e.target.value)} style={inputStyle} />
+                        <FieldLabel title="Minimum in-situ manganese grade for material counted toward the target.">Required grade (% Mn)</FieldLabel>
+                        <IconField icon={<FlaskConical size={14} />} suffix="% Mn">
+                          <input type="number" value={gradePct} onChange={(e) => setGradePct(e.target.value)} style={bareInput} />
+                        </IconField>
                         <span style={hintStyle}>0–100%</span>
                       </label>
                       <label style={labelStyle}>
@@ -376,19 +384,25 @@ function NewProjectWizard() {
 
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
                       <label style={labelStyle}>
-                        Required grade (% Mn)
-                        <input type="number" value={gradePct} onChange={(e) => setGradePct(e.target.value)} style={inputStyle} />
+                        <FieldLabel title="Minimum in-situ manganese grade for material counted toward the target.">Required grade (% Mn)</FieldLabel>
+                        <IconField icon={<FlaskConical size={14} />} suffix="%">
+                          <input type="number" value={gradePct} onChange={(e) => setGradePct(e.target.value)} style={bareInput} />
+                        </IconField>
                         <span style={hintStyle}>0–100%</span>
                       </label>
                       <label style={labelStyle}>
-                        Working days
-                        <input type="number" value={periodDays} onChange={(e) => setPeriodDays(e.target.value)} style={inputStyle} />
+                        <FieldLabel title="Calendar days in the schedule window - the plan spreads the target across exactly this many days, monsoon and maintenance days included.">
+                          Working days
+                        </FieldLabel>
+                        <IconField icon={<Hammer size={14} />}>
+                          <input type="number" value={periodDays} onChange={(e) => setPeriodDays(e.target.value)} style={bareInput} />
+                        </IconField>
                       </label>
                     </div>
 
                     <label style={labelStyle}>
                       Benches in rotation (comma separated)
-                      <ChipInput values={benchList} onChange={setBenchList} placeholder="Add benches…" />
+                      <ChipInput icon={<Layers size={14} />} values={benchList} onChange={setBenchList} placeholder="Add benches…" />
                     </label>
                   </>
                 ) : (
@@ -416,9 +430,14 @@ function NewProjectWizard() {
                     padding: 12,
                   }}
                 >
-                  Have old borehole logs or production registers? Create the project, then drop them on
-                  its <strong>Data</strong> tab — the parser proposes a column mapping and imports
-                  nothing until you confirm it.
+                  <span style={{ flexShrink: 0, marginTop: 1 }}>
+                    <Info size={14} />
+                  </span>
+                  <span>
+                    Have old borehole logs or production registers? Create the project, then drop them on
+                    its <strong>Data</strong> tab — the parser proposes a column mapping and imports
+                    nothing until you confirm it.
+                  </span>
                 </div>
 
                 <Nav
@@ -439,6 +458,7 @@ function NewProjectWizard() {
           {step === 2 && liveTarget && <SchedulePreviewPanel target={liveTarget} />}
         </div>
       </main>
+      </div>
     </div>
   );
 }
@@ -447,10 +467,12 @@ function ChipInput({
   values,
   onChange,
   placeholder,
+  icon,
 }: {
   values: string[];
   onChange: (next: string[]) => void;
   placeholder?: string;
+  icon?: React.ReactNode;
 }) {
   const [draft, setDraft] = useState("");
 
@@ -480,6 +502,7 @@ function ChipInput({
         alignItems: "center",
       }}
     >
+      {icon && <span style={{ color: "var(--ink-dim)", display: "flex", flexShrink: 0, paddingLeft: 2 }}>{icon}</span>}
       {values.map((v) => (
         <span
           key={v}
@@ -551,6 +574,31 @@ function Nav({
   );
 }
 
+/** A field label with a small info glyph after it - purely a "this has a definition, hover for
+ *  it" affordance, so the tooltip text lives right on the element rather than in a separate
+ *  lookup table. */
+function FieldLabel({ children, title }: { children: React.ReactNode; title?: string }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+      {children}
+      <Info size={11} style={{ opacity: 0.6 }} {...(title ? { title } : {})} />
+    </span>
+  );
+}
+
+/** A bordered input box with a leading icon and an optional trailing unit - the "12000 tonnes"
+ *  / "34 % Mn" style fields. The icon and suffix are decoration around a single bare <input>;
+ *  the border lives on this wrapper so the input itself never draws its own. */
+function IconField({ icon, suffix, children }: { icon: React.ReactNode; suffix?: string; children: React.ReactNode }) {
+  return (
+    <div style={{ ...inputStyle, display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ color: "var(--ink-dim)", display: "flex", flexShrink: 0 }}>{icon}</span>
+      {children}
+      {suffix && <span style={{ color: "var(--ink-dim)", fontSize: 12, flexShrink: 0, whiteSpace: "nowrap" }}>{suffix}</span>}
+    </div>
+  );
+}
+
 const labelStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -585,6 +633,18 @@ const dateSubInput: React.CSSProperties = {
   color: "var(--ink)",
   flex: 1,
   minWidth: 0,
+};
+
+/** The input itself, once IconField supplies the border/background/padding around it. */
+const bareInput: React.CSSProperties = {
+  border: "none",
+  background: "transparent",
+  outline: "none",
+  fontSize: 13.5,
+  color: "var(--ink)",
+  flex: 1,
+  minWidth: 0,
+  padding: 0,
 };
 
 const primaryBtn: React.CSSProperties = {
