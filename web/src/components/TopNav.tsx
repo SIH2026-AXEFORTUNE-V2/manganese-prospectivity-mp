@@ -1,9 +1,12 @@
 // Wordmark + workspace switch + theme toggle, echoing the reference's top bar (logo,
 // search, avatar). Explore/Protect is a pill toggle here, same pattern as the reference's
 // "Junior / Middle / Senior" segmented control - the active segment gets the lime chip.
+// Also includes the 3D Balaghat Cutaway view link (Issue #8).
 
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import ThemeToggle from "./ThemeToggle";
 
 export default function TopNav({
@@ -13,6 +16,9 @@ export default function TopNav({
   workspace: "explore" | "protect";
   onWorkspaceChange: (w: "explore" | "protect") => void;
 }) {
+  const pathname = usePathname();
+  const isCutaway = pathname === "/cutaway";
+
   return (
     <header
       style={{
@@ -23,10 +29,10 @@ export default function TopNav({
         gap: 20,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <Link href="/" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
         <span style={{ fontSize: 20 }}>🧭</span>
         <strong style={{ fontSize: 17, letterSpacing: "0.01em" }}>ORE COMPASS</strong>
-      </div>
+      </Link>
 
       <div
         style={{
@@ -39,24 +45,58 @@ export default function TopNav({
           gap: 4,
         }}
       >
-        {(["explore", "protect"] as const).map((w) => (
-          <button
-            key={w}
-            onClick={() => onWorkspaceChange(w)}
-            style={{
-              border: "none",
-              borderRadius: 999,
-              padding: "8px 18px",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-              background: workspace === w ? "var(--accent-lime)" : "transparent",
-              color: workspace === w ? "var(--chip-dark)" : "var(--ink)",
-            }}
-          >
-            {w === "explore" ? "Explore" : "Protect"}
-          </button>
-        ))}
+        <Link
+          href="/"
+          onClick={() => onWorkspaceChange("explore")}
+          style={{
+            textDecoration: "none",
+            borderRadius: 999,
+            padding: "8px 18px",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            background: !isCutaway && workspace === "explore" ? "var(--accent-lime)" : "transparent",
+            color: !isCutaway && workspace === "explore" ? "var(--chip-dark)" : "var(--ink)",
+            transition: "all 0.18s ease",
+            display: "inline-block",
+          }}
+        >
+          Explore Map
+        </Link>
+        <Link
+          href="/cutaway"
+          style={{
+            textDecoration: "none",
+            borderRadius: 999,
+            padding: "8px 18px",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            background: isCutaway ? "var(--accent-lime)" : "transparent",
+            color: isCutaway ? "var(--chip-dark)" : "var(--ink)",
+            transition: "all 0.18s ease",
+            display: "inline-block",
+          }}
+        >
+          Balaghat Cutaway (3D)
+        </Link>
+        <button
+          type="button"
+          onClick={() => onWorkspaceChange("protect")}
+          style={{
+            border: "none",
+            borderRadius: 999,
+            padding: "8px 18px",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            background: !isCutaway && workspace === "protect" ? "var(--accent-lime)" : "transparent",
+            color: !isCutaway && workspace === "protect" ? "var(--chip-dark)" : "var(--ink)",
+            transition: "all 0.18s ease",
+          }}
+        >
+          Protect
+        </button>
       </div>
 
       <ThemeToggle />
