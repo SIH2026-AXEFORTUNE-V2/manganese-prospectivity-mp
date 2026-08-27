@@ -9,7 +9,7 @@
   ],
   "layers": {
     "fused": {
-      "static_image": null,
+      "static_image": "score_fused.png",
       "tiles": "/tiles/fused/{z}/{x}/{y}.png",
       "bounds": [
         78.280991,
@@ -23,7 +23,7 @@
       ]
     },
     "signature": {
-      "static_image": null,
+      "static_image": "score_signature.png",
       "tiles": "/tiles/signature/{z}/{x}/{y}.png",
       "bounds": [
         78.280991,
@@ -37,7 +37,7 @@
       ]
     },
     "anomaly": {
-      "static_image": null,
+      "static_image": "score_anomaly.png",
       "tiles": "/tiles/anomaly/{z}/{x}/{y}.png",
       "bounds": [
         78.280991,
@@ -52,14 +52,12 @@
     }
   },
   "terrain": {
-    "tiles": "/tiles/terrain_rgb/{z}/{x}/{y}.png",
-    "bounds": [
-      78.281086,
-      21.278168,
-      80.900887,
-      22.322705
-    ],
-    "encoding": "terrarium-mapbox"
+    "static_grid": "terrain.json",
+    "terrain_rgb_tiles": "/tiles/terrain_rgb/{z}/{x}/{y}.png",
+    "elevation_range_m": [
+      244.9,
+      1172.7
+    ]
   },
   "vectors": {
     "mines": "mines.geojson",
