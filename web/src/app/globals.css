@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------------------------
+   Ore Compass app theme - dark glass + lime accent, per the UI reference the team
+   supplied. Rule for the accent: --accent-lime NEVER sits directly on a light surface -
+   it only ever lives inside a --chip-dark pill (a ring track, a filled button, a badge).
+   That's what keeps one neon hex legible in both themes instead of needing two accents.
+   Everything else follows the same light/dark token pattern as the planning artifacts:
+   bare :root is the light palette, prefers-color-scheme redefines it for dark, and
+   [data-theme] on <html> (flipped by ThemeToggle) wins over both.
+   ------------------------------------------------------------------------------------ */
+:root {
+  --bg: #edefe7;
+  --bg-2: #e3e6da;
+  --glass: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(18, 20, 15, 0.1);
+  --ink: #14150f;
+  --ink-dim: #5b6154;
+  --rule: rgba(18, 20, 15, 0.12);
+
+  /* constant across both themes - see rule above */
+  --accent-lime: #c8ff3d;
+  --chip-dark: #14150f;
+  --chip-dark-ink: #edefe7;
+
+  --good: #3f7d52;
+  --warn: #a9791f;
+  --critical: #c0392b;
+
+  --background: var(--bg);
+  --foreground: var(--ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e0f0c;
+    --bg-2: #1b1c16;
+    --glass: rgba(255, 255, 255, 0.06);
+    --glass-border: rgba(255, 255, 255, 0.12);
+    --ink: #edefe7;
+    --ink-dim: #9aa08c;
+    --rule: rgba(255, 255, 255, 0.12);
+
+    --good: #6fbe7f;
+    --warn: #e0aa4a;
+    --critical: #e2695a;
+
+    --background: var(--bg);
+    --foreground: var(--ink);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0e0f0c;
+  --bg-2: #1b1c16;
+  --glass: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --ink: #edefe7;
+  --ink-dim: #9aa08c;
+  --rule: rgba(255, 255, 255, 0.12);
+
+  --good: #6fbe7f;
+  --warn: #e0aa4a;
+  --critical: #e2695a;
+
+  --background: var(--bg);
+  --foreground: var(--ink);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: linear-gradient(160deg, var(--bg) 0%, var(--bg-2) 100%);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}

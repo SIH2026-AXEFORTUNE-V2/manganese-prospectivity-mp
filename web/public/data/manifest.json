@@ -1,0 +1,70 @@
+{
+  "generated_at": "2026-08-27T06:58:21+00:00",
+  "aoi": "belt_sausar",
+  "bounds": [
+    78.300206,
+    21.278257,
+    80.899986,
+    22.322615
+  ],
+  "layers": {
+    "fused": {
+      "static_image": "score_fused.png",
+      "tiles": null,
+      "bounds": [
+        78.300206,
+        21.278257,
+        80.899986,
+        22.322615
+      ],
+      "value_range": [
+        0,
+        1
+      ]
+    },
+    "signature": {
+      "static_image": "score_signature.png",
+      "tiles": null,
+      "bounds": [
+        78.300206,
+        21.278257,
+        80.899986,
+        22.322615
+      ],
+      "value_range": [
+        0,
+        1
+      ]
+    },
+    "anomaly": {
+      "static_image": "score_anomaly.png",
+      "tiles": null,
+      "bounds": [
+        78.300206,
+        21.278257,
+        80.899986,
+        22.322615
+      ],
+      "value_range": [
+        0,
+        1
+      ]
+    }
+  },
+  "terrain": {
+    "static_grid": "terrain.json",
+    "terrain_rgb_tiles": null,
+    "elevation_range_m": [
+      252.4593963623047,
+      1088.9432373046875
+    ]
+  },
+  "vectors": {
+    "mines": "mines.geojson",
+    "negatives": "negatives.geojson",
+    "clusters": "clusters.geojson",
+    "targets": "targets.geojson"
+  },
+  "validation": "validation.json",
+  "risk": "risk.json"
+}

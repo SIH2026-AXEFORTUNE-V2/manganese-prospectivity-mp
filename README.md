@@ -8,6 +8,10 @@ builds a held-out validation set of known manganese locations.
 
 - Plan: [docs/00-project-plan.md](docs/00-project-plan.md)
 - Bhoonidhi API + catalogue survey: [docs/bhoonidhi-data-inventory.md](docs/bhoonidhi-data-inventory.md)
+- Web app (in progress): [web/](web/) — Next.js + MapLibre + deck.gl, reads
+  [docs/04-data-contract.md](docs/04-data-contract.md). Open tasks are tracked as
+  self-contained specs in [docs/issues/](docs/issues/) — start at
+  [docs/issues/00-milestones.md](docs/issues/00-milestones.md).
 
 ---
 
