@@ -19,9 +19,14 @@ import { useOreCompassData } from "@/lib/useOreCompassData";
 // to happen in a Client Component (this file, "use client" above); Next.js errors if you
 // try it from a Server Component. See node_modules/next/dist/docs/01-app/02-guides/lazy-loading.md.
 const CommandMap = dynamic(() => import("@/components/CommandMap"), { ssr: false });
+// Same browser-only rule as CommandMap - three.js/WebGL touch `window` on import.
+const EarthGlobe = dynamic(() => import("@/components/EarthGlobe"), { ssr: false });
 
 export default function Home() {
   const [workspace, setWorkspace] = useState<"explore" | "protect">("explore");
+  // Which centerpiece fills the map area: the breathing globe or the georeferenced
+  // belt map. Globe is the default; the switch below flips it.
+  const [view, setView] = useState<"globe" | "map">("globe");
   const { status, error, manifest, targets, mines, validation } = useOreCompassData();
 
   return (
@@ -38,7 +43,9 @@ export default function Home() {
             border: "1px solid var(--glass-border)",
           }}
         >
-          {status === "ready" && manifest && targets && mines ? (
+          {view === "globe" ? (
+            <EarthGlobe />
+          ) : status === "ready" && manifest && targets && mines ? (
             <CommandMap manifest={manifest} targets={targets} mines={mines} />
           ) : (
             <div
@@ -55,6 +62,43 @@ export default function Home() {
               {status === "error" ? `error: ${error}` : "loading belt_sausar fixture…"}
             </div>
           )}
+        </div>
+
+        {/* Globe / Map switch - same pill pattern as the TopNav workspace toggle. */}
+        <div
+          style={{
+            position: "absolute",
+            top: 20,
+            left: "50%",
+            transform: "translateX(-50%)",
+            display: "flex",
+            gap: 4,
+            padding: 4,
+            borderRadius: 999,
+            background: "var(--glass)",
+            border: "1px solid var(--glass-border)",
+            backdropFilter: "blur(16px)",
+          }}
+        >
+          {(["globe", "map"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              style={{
+                border: "none",
+                borderRadius: 999,
+                padding: "6px 16px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                textTransform: "capitalize",
+                background: view === v ? "var(--accent-lime)" : "transparent",
+                color: view === v ? "var(--chip-dark)" : "var(--ink)",
+              }}
+            >
+              {v}
+            </button>
+          ))}
         </div>
 
         {/* Floating headline: what the model claims, sourced from the same validation
