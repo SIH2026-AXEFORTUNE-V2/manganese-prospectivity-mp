@@ -159,8 +159,18 @@ def _tile_terrain_rgb(cog_path: Path, band: int, out_dir: Path, min_zoom: int, m
         for t in _iter_intersecting_tiles(reader, min_zoom, max_zoom):
             tile_data = reader.tile(t.x, t.y, t.z, indexes=band)
             elevation = tile_data.data[0].astype("float64")
-            mask = tile_data.mask > 0
+            # Don't trust the tile mask alone - this DEM has NaN pixels the source file's own
+            # nodata metadata doesn't flag as invalid (same gap noted in
+            # docs/03-baseline-results.md for the terrain bands), so intersect with a direct
+            # finite-value check.
+            mask = (tile_data.mask > 0) & np.isfinite(elevation)
 
+            # NaN elevation at nodata pixels would otherwise flow into an invalid float->uint
+            # cast (undefined per-platform garbage bytes, not just "0") - alpha already marks
+            # these invalid, but a terrain mesh reader that decodes elevation without checking
+            # alpha (common - alpha is usually just for the colour texture) would turn that
+            # garbage into real spikes. 0 is deterministic and always masked out by rgba[...,3].
+            elevation = np.where(mask, elevation, 0.0)
             encoded = np.round((elevation - _TERRAIN_RGB_BASE) / _TERRAIN_RGB_INTERVAL)
             encoded = np.clip(encoded, 0, 256**3 - 1).astype("uint32")
 

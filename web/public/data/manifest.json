@@ -52,12 +52,14 @@
     }
   },
   "terrain": {
-    "static_grid": "terrain.json",
-    "terrain_rgb_tiles": null,
-    "elevation_range_m": [
-      252.4593963623047,
-      1088.9432373046875
-    ]
+    "tiles": "/tiles/terrain_rgb/{z}/{x}/{y}.png",
+    "bounds": [
+      78.281086,
+      21.278168,
+      80.900887,
+      22.322705
+    ],
+    "encoding": "terrarium-mapbox"
   },
   "vectors": {
     "mines": "mines.geojson",
