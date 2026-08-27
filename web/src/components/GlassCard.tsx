@@ -8,14 +8,17 @@ export default function GlassCard({
   children,
   style,
   className,
+  onClick,
 }: {
   children: ReactNode;
   style?: CSSProperties;
   className?: string;
+  onClick?: () => void;
 }) {
   return (
     <div
       className={className}
+      onClick={onClick}
       style={{
         background: "var(--glass)",
         border: "1px solid var(--glass-border)",
