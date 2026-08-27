@@ -5,7 +5,8 @@
 // 1. 2D Mode: MapLibre base map + deck.gl BitmapLayer (fused prospectivity score) + GeoJsonLayers (targets & mines).
 // 2. 3D Mode: Georeferenced 3D terrain mesh decoded from terrain.json, draped with the fused prospectivity score,
 //    true-elevation surface mine markers, and subsurface depth plumb-line annotations for underground mines (Balaghat: ▼ 383 m).
-// 3. Dynamic Controls: 2D ⟷ 3D mode switch pill, vertical exaggeration slider (1x to 8x), and interactive tooltips.
+// 3. Live Geospatial Coordinates: Real-time Longitude & Latitude HUD badge, elevation readout, and feature coordinate tooltips.
+// 4. Dynamic Controls: 2D ⟷ 3D mode switch pill, vertical exaggeration slider (1x to 8x), and interactive tooltips.
 
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { Map as MapLibreMap, setWorkerUrl } from "maplibre-gl";
@@ -137,6 +138,13 @@ function buildTerrainMesh(terrain: DecodedTerrain, exaggeration: number) {
   return { positions, texCoords, indices };
 }
 
+// Format latitude and longitude nicely with N/S and E/W direction notation
+function formatCoordinates(lat: number, lon: number): string {
+  const latStr = `${Math.abs(lat).toFixed(4)}° ${lat >= 0 ? "N" : "S"}`;
+  const lonStr = `${Math.abs(lon).toFixed(4)}° ${lon >= 0 ? "E" : "W"}`;
+  return `${latStr}, ${lonStr}`;
+}
+
 export default function CommandMap({
   manifest,
   targets,
@@ -159,6 +167,19 @@ export default function CommandMap({
     y: number;
     object: Record<string, unknown> | null;
   } | null>(null);
+
+  // Live coordinates state (mouse cursor position and elevation)
+  const [cursorCoords, setCursorCoords] = useState<{
+    lat: number;
+    lon: number;
+    elev: number;
+    zoom: number;
+  }>({
+    lat: 21.85,
+    lon: 79.6,
+    elev: 320,
+    zoom: 7.0,
+  });
 
   // Decode terrain data once when prop arrives
   const decodedTerrain = useMemo(() => {
@@ -266,6 +287,28 @@ export default function CommandMap({
 
     map.on("error", (e) => console.error("MapLibre error:", e.error));
 
+    // Track live cursor coordinates and elevation across map moves
+    map.on("mousemove", (e) => {
+      const lon = e.lngLat.lng;
+      const lat = e.lngLat.lat;
+      const elev = sampleElevation(lon, lat, decodedTerrain);
+      setCursorCoords({
+        lon,
+        lat,
+        elev: Math.round(elev),
+        zoom: parseFloat(map.getZoom().toFixed(1)),
+      });
+    });
+
+    map.on("move", () => {
+      const center = map.getCenter();
+      const elev = sampleElevation(center.lng, center.lat, decodedTerrain);
+      setCursorCoords((prev) => ({
+        ...prev,
+        zoom: parseFloat(map.getZoom().toFixed(1)),
+      }));
+    });
+
     map.on("load", () => {
       if (manifest.bounds) {
         const [west, south, east, north] = manifest.bounds;
@@ -284,7 +327,7 @@ export default function CommandMap({
       mapRef.current = null;
       overlayRef.current = null;
     };
-  }, [manifest.bounds]);
+  }, [manifest.bounds, decodedTerrain]);
 
   // Update deck.gl layers reactively on state changes
   useEffect(() => {
@@ -436,6 +479,43 @@ export default function CommandMap({
       {/* MapLibre Canvas Container */}
       <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
 
+      {/* Live Longitude & Latitude HUD Badge (Bottom-Left above target rail) */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 120, // Above TargetRail
+          left: 20,
+          zIndex: 10,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          background: "var(--glass)",
+          border: "1px solid var(--glass-border)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          borderRadius: 999,
+          padding: "6px 14px",
+          color: "var(--ink)",
+          fontSize: 12,
+          fontFamily: "monospace",
+          boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
+          pointerEvents: "none",
+        }}
+      >
+        <span style={{ color: "var(--accent-lime)", fontSize: 13 }}>📍</span>
+        <span style={{ fontWeight: 600 }}>
+          {formatCoordinates(cursorCoords.lat, cursorCoords.lon)}
+        </span>
+        <span style={{ color: "var(--ink-dim)" }}>|</span>
+        <span style={{ color: "var(--ink-dim)" }}>
+          {cursorCoords.elev} m ASL
+        </span>
+        <span style={{ color: "var(--ink-dim)" }}>|</span>
+        <span style={{ color: "var(--accent-lime)" }}>
+          z {cursorCoords.zoom}
+        </span>
+      </div>
+
       {/* Map Control Floating Card (Top Center / Right) */}
       <div
         style={{
@@ -565,48 +645,59 @@ export default function CommandMap({
             left: hoverInfo.x + 12,
             top: hoverInfo.y + 12,
             pointerEvents: "none",
-            background: "rgba(20, 21, 15, 0.92)",
+            background: "rgba(20, 21, 15, 0.94)",
             border: "1px solid var(--glass-border)",
             backdropFilter: "blur(12px)",
             borderRadius: 10,
-            padding: "8px 12px",
+            padding: "9px 13px",
             color: "var(--ink)",
             fontSize: 12,
             zIndex: 100,
-            boxShadow: "0 6px 20px rgba(0,0,0,0.4)",
-            maxWidth: 240,
+            boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
+            maxWidth: 260,
           }}
         >
           {hoverInfo.object.name ? (
             <div>
-              <strong style={{ display: "block", color: "var(--accent-lime)" }}>
+              <strong style={{ display: "block", color: "var(--accent-lime)", fontSize: 13 }}>
                 {String(hoverInfo.object.name)}
               </strong>
               <div style={{ color: "var(--ink-dim)", fontSize: 11, marginTop: 2 }}>
-                Type: {String(hoverInfo.object.mine_type || "N/A")}
+                Type: <span style={{ color: "var(--ink)", fontWeight: 500 }}>{String(hoverInfo.object.mine_type || "N/A")}</span>
+              </div>
+              <div style={{ color: "var(--ink-dim)", fontSize: 11, fontFamily: "monospace", marginTop: 2 }}>
+                📍 {formatCoordinates(Number(hoverInfo.object.lat), Number(hoverInfo.object.lon))}
               </div>
               {hoverInfo.object.depth_m !== undefined && hoverInfo.object.depth_m !== null && (
-                <div style={{ color: "var(--accent-lime)", fontSize: 11, fontWeight: 600 }}>
+                <div style={{ color: "var(--accent-lime)", fontSize: 11, fontWeight: 600, marginTop: 2 }}>
                   Depth: ▼ {String(hoverInfo.object.depth_m)} m
                 </div>
               )}
               {hoverInfo.object.rawSurfaceM !== undefined && (
-                <div style={{ color: "var(--ink-dim)", fontSize: 10 }}>
+                <div style={{ color: "var(--ink-dim)", fontSize: 10, marginTop: 1 }}>
                   Elev: {Math.round(Number(hoverInfo.object.rawSurfaceM))} m ASL
                 </div>
               )}
             </div>
           ) : hoverInfo.object.properties ? (
             <div>
-              <strong style={{ display: "block", color: "var(--accent-lime)" }}>
+              <strong style={{ display: "block", color: "var(--accent-lime)", fontSize: 13 }}>
                 Target #{String((hoverInfo.object.properties as Record<string, unknown>).rank || "—")}
               </strong>
               <div style={{ color: "var(--ink-dim)", fontSize: 11, marginTop: 2 }}>
-                Area: {String((hoverInfo.object.properties as Record<string, unknown>).area_ha || 0)} ha
+                Area: <span style={{ color: "var(--ink)", fontWeight: 500 }}>{String((hoverInfo.object.properties as Record<string, unknown>).area_ha || 0)} ha</span>
               </div>
               <div style={{ color: "var(--ink-dim)", fontSize: 11 }}>
-                Score: {Number((hoverInfo.object.properties as Record<string, unknown>).score_mean || 0).toFixed(2)}
+                Score: <span style={{ color: "var(--accent-lime)", fontWeight: 600 }}>{Number((hoverInfo.object.properties as Record<string, unknown>).score_mean || 0).toFixed(2)}</span>
               </div>
+              {(hoverInfo.object.properties as Record<string, unknown>).lat !== undefined && (
+                <div style={{ color: "var(--ink-dim)", fontSize: 10, fontFamily: "monospace", marginTop: 2 }}>
+                  📍 {formatCoordinates(
+                    Number((hoverInfo.object.properties as Record<string, unknown>).lat),
+                    Number((hoverInfo.object.properties as Record<string, unknown>).lon),
+                  )}
+                </div>
+              )}
             </div>
           ) : null}
         </div>
