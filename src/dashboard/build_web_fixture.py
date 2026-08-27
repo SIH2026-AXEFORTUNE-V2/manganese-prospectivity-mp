@@ -21,6 +21,7 @@ import shutil
 from datetime import datetime, timezone
 
 from src.config import ROOT
+from src.validate.risk_rules import generate_risk_data
 
 BUNDLE = ROOT / "dashboard" / "assets" / "bundle.json"
 ASSETS = ROOT / "dashboard" / "assets"
@@ -111,12 +112,18 @@ def main() -> int:
     (OUT / "validation.json").write_text(json.dumps(validation, separators=(",", ":")), encoding="utf-8")
     print(f"\nValidation: {'present' if validation else 'MISSING'}")
 
-    # risk.json has no source yet - src/validate/risk_rules.py doesn't exist (see
-    # docs/issues/04-risk-rules.md). Ship an empty, contract-shaped array rather than
-    # nothing, so the frontend's loader code has a real (if empty) file to point at.
-    if not (OUT / "risk.json").exists():
-        (OUT / "risk.json").write_text("[]", encoding="utf-8")
-        print("Risk: [] placeholder written - see docs/issues/04-risk-rules.md")
+    # Generate risk.json using src/validate/risk_rules.py
+    risk_out_path = OUT / "risk.json"
+    geojson_path = ROOT / "data" / "validation" / "known_mn_occurrences.geojson"
+    
+    try:
+        risk_data = generate_risk_data(geojson_path)
+        risk_out_path.write_text(json.dumps(risk_data, separators=(",", ":")), encoding="utf-8")
+        print(f"Risk: {len(risk_data)} operating mines generated via risk_rules.py")
+    except Exception as e:
+        print(f"Risk: Failed to generate risk data - {e}")
+        if not risk_out_path.exists():
+            risk_out_path.write_text("[]", encoding="utf-8")
 
     (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     print(f"\nwrote {(OUT / 'manifest.json').relative_to(ROOT)}")
