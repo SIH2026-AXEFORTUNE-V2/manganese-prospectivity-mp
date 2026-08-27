@@ -22,3 +22,8 @@ scipy>=1.13.0
 # Viz / notebooks
 matplotlib>=3.8.0
 jupyter>=1.0.0
+
+# Web tiling (docs/issues/01-statewide-tiling.md)
+rio-cogeo>=5.4.0
+rio-tiler>=6.4.0
+mercantile>=1.2.1
