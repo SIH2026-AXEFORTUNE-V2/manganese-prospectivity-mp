@@ -12,7 +12,9 @@ import TopNav from "@/components/TopNav";
 import GlassCard from "@/components/GlassCard";
 import StatCards from "@/components/StatCards";
 import TargetRail from "@/components/TargetRail";
+import DetailDrawer from "@/components/DetailDrawer";
 import { useOreCompassData } from "@/lib/useOreCompassData";
+import type { TargetProperties } from "@/lib/contract";
 
 // maplibre-gl touches `window` as soon as it's instantiated, so the map component can only
 // ever run in the browser - `ssr: false` skips trying to render it on the server. This has
@@ -22,7 +24,21 @@ const CommandMap = dynamic(() => import("@/components/CommandMap"), { ssr: false
 
 export default function Home() {
   const [workspace, setWorkspace] = useState<"explore" | "protect">("explore");
+  const [selectedRank, setSelectedRank] = useState<number | null>(null);
   const { status, error, manifest, targets, mines, validation, terrain } = useOreCompassData();
+
+  // Derive the selected target's properties for the drawer
+  const selectedTarget: TargetProperties | null =
+    selectedRank !== null && targets
+      ? ((targets.features
+          .map((f) => f.properties as unknown as TargetProperties)
+          .find((t) => t.rank === selectedRank)) ?? null)
+      : null;
+
+  function handleSelect(rank: number) {
+    // Clicking the same card again deselects (closes the drawer)
+    setSelectedRank((prev) => (prev === rank ? null : rank));
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
@@ -70,17 +86,30 @@ export default function Home() {
           </GlassCard>
         </div>
 
-        {/* Stat cards, top-right - held-out percentile / negative controls / p-value. */}
-        {status === "ready" && validation && (
+        {/* Stat cards: hidden when drawer is open (drawer occupies same top-right area) */}
+        {status === "ready" && validation && !selectedTarget && (
           <div style={{ position: "absolute", top: 20, right: 20, width: 210 }}>
             <StatCards validation={validation} />
           </div>
         )}
 
+        {/* Detail drawer — Evidence & Validation panels for the selected target */}
+        {selectedTarget && validation && (
+          <DetailDrawer
+            target={selectedTarget}
+            validation={validation}
+            onClose={() => setSelectedRank(null)}
+          />
+        )}
+
         {/* Ranked-target rail, bottom - one card per target, ScoreRing for its fused score. */}
         {status === "ready" && targets && (
           <div style={{ position: "absolute", left: 20, right: 20, bottom: 20 }}>
-            <TargetRail targets={targets} />
+            <TargetRail
+              targets={targets}
+              selectedRank={selectedRank}
+              onSelect={handleSelect}
+            />
           </div>
         )}
       </main>

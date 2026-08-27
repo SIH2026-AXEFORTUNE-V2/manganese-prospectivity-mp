@@ -12,6 +12,7 @@ import {
   type TerrainData,
   type FeatureCollectionLike,
   type ValidationReport,
+  type RiskEntry,
 } from "./contract";
 
 interface OreCompassData {
@@ -22,6 +23,7 @@ interface OreCompassData {
   mines: FeatureCollectionLike | null;
   validation: ValidationReport | null;
   terrain: TerrainData | null;
+  risk: RiskEntry[] | null;
 }
 
 export function useOreCompassData(): OreCompassData {
@@ -33,6 +35,7 @@ export function useOreCompassData(): OreCompassData {
     mines: null,
     validation: null,
     terrain: null,
+    risk: null,
   });
 
   useEffect(() => {
@@ -41,16 +44,17 @@ export function useOreCompassData(): OreCompassData {
     async function run() {
       try {
         const manifest = await loadManifest();
-        const [targets, mines, validation, terrain] = await Promise.all([
+        const [targets, mines, validation, terrain, risk] = await Promise.all([
           loadJson<FeatureCollectionLike>(manifest.vectors.targets),
           loadJson<FeatureCollectionLike>(manifest.vectors.mines),
           loadJson<ValidationReport>(manifest.validation),
           manifest.terrain.static_grid
             ? loadJson<TerrainData>(manifest.terrain.static_grid)
             : Promise.resolve(null),
+          loadJson<RiskEntry[]>(manifest.risk),
         ]);
         if (!cancelled) {
-          setData({ status: "ready", error: null, manifest, targets, mines, validation, terrain });
+          setData({ status: "ready", error: null, manifest, targets, mines, validation, terrain, risk });
         }
       } catch (err) {
         if (!cancelled) {

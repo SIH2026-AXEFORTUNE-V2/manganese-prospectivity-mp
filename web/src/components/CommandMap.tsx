@@ -20,7 +20,8 @@ import { MapboxOverlay } from "@deck.gl/mapbox";
 import type { Layer } from "@deck.gl/core";
 import { BitmapLayer, GeoJsonLayer, ScatterplotLayer, PathLayer, TextLayer } from "@deck.gl/layers";
 import { SimpleMeshLayer } from "@deck.gl/mesh-layers";
-import type { Manifest, FeatureCollectionLike, TerrainData } from "@/lib/contract";
+import { TileLayer } from "@deck.gl/geo-layers";
+import type { Manifest, LayerManifest, FeatureCollectionLike, TerrainData } from "@/lib/contract";
 
 // CARTO Dark Matter vector basemap style
 const BASEMAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
@@ -163,6 +164,49 @@ function formatCoordinates(lat: number, lon: number): string {
   const latStr = `${Math.abs(lat).toFixed(4)}° ${lat >= 0 ? "N" : "S"}`;
   const lonStr = `${Math.abs(lon).toFixed(4)}° ${lon >= 0 ? "E" : "W"}`;
   return `${latStr}, ${lonStr}`;
+}
+
+// Picks tiles when available, falls back to a single draped image otherwise. Also used as
+// the 3D mesh texture below - the score layer is the score layer regardless of view mode.
+// Never returns null silently without a reason - a layer manifest with neither field set is
+// a data bug, not a "just don't draw anything" case, so it's worth being able to grep the
+// console for.
+function buildScoreLayer(layer: LayerManifest | undefined): Layer | null {
+  if (!layer) return null;
+
+  if (layer.tiles) {
+    // layer.tiles is already an absolute path template, e.g. "/tiles/fused/{z}/{x}/{y}.png"
+    // (docs/04-data-contract.md) - don't prefix it again here.
+    return new TileLayer({
+      id: "score-fused-tiles",
+      data: layer.tiles,
+      minZoom: 0,
+      maxZoom: 19,
+      tileSize: 256,
+      opacity: 0.8,
+      renderSubLayers: (props) => {
+        const { boundingBox } = props.tile;
+        const [[west, south], [east, north]] = boundingBox as [[number, number], [number, number]];
+        return new BitmapLayer(props, {
+          data: undefined,
+          image: props.data,
+          bounds: [west, south, east, north],
+        });
+      },
+    });
+  }
+
+  if (layer.static_image) {
+    return new BitmapLayer({
+      id: "score-fused",
+      image: `/data/${layer.static_image}`,
+      bounds: layer.bounds,
+      opacity: 0.8,
+    });
+  }
+
+  console.warn("score layer has neither `tiles` nor `static_image` - nothing to draw", layer);
+  return null;
 }
 
 export default function CommandMap({
@@ -393,6 +437,10 @@ export default function CommandMap({
     });
 
     map.on("load", () => {
+      // Layer construction happens in the reactive effect below, keyed on mode/exaggeration/
+      // manifest - it needs to rerun on state changes the map's one-time load event can't see,
+      // so it's not duplicated here. See buildScoreLayer() (used for both the 2D BitmapLayer/
+      // TileLayer and the 3D mesh texture) and the "Update deck.gl layers reactively" effect.
       if (manifest.bounds) {
         const [west, south, east, north] = manifest.bounds;
         map.fitBounds(
@@ -422,16 +470,11 @@ export default function CommandMap({
 
     if (mode === "2d") {
       // --- 2D LAYERS ---
-      if (fused?.static_image) {
-        layers.push(
-          new BitmapLayer({
-            id: "score-fused-2d",
-            image: `/data/${fused.static_image}`,
-            bounds: fused.bounds,
-            opacity: 0.82,
-          }),
-        );
-      }
+      // buildScoreLayer prefers real XYZ tiles when the manifest has them (only fetches
+      // what's on screen - matters once this covers more than one belt), falling back to
+      // the single static_image otherwise.
+      const scoreLayer2d = buildScoreLayer(fused);
+      if (scoreLayer2d) layers.push(scoreLayer2d);
 
       layers.push(
         new GeoJsonLayer({
@@ -457,6 +500,17 @@ export default function CommandMap({
       );
     } else {
       // --- 3D GEOREFERENCED TERRAIN LAYERS ---
+      // Deliberately uses fused.static_image directly, not buildScoreLayer() - a
+      // SimpleMeshLayer texture needs one full-coverage image, not a tile pyramid, so this
+      // is the one place static_image staying populated (src/dashboard/build_tiles.py keeps
+      // it alongside tiles for exactly this reason) actually matters.
+      //
+      // The terrain mesh itself is still decodeTerrain()'d from manifest.terrain.static_grid
+      // (a coarse belt-only base64 heightmap), not manifest.terrain.terrain_rgb_tiles (the
+      // real per-pixel elevation tiles build_tiles.py now produces). Swapping the mesh
+      // construction over to a proper deck.gl TerrainLayer reading terrain_rgb_tiles is real,
+      // separate follow-up work - this merge only wires the data through, doesn't rebuild
+      // the mesh pipeline.
       if (terrainMesh && fused?.static_image) {
         layers.push(
           new SimpleMeshLayer({
