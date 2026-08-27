@@ -111,13 +111,22 @@ export default function CesiumCutaway() {
         // project (deliberately - MapLibre was picked for the 2D map for the same reason:
         // "no API token needed"), so the default imagery/terrain providers - which fetch
         // Cesium World Imagery/Terrain via ion - fail repeatedly and trip Cesium's own
-        // "Rendering has stopped" safety halt. `baseLayer: false` skips fetching any
-        // imagery at all; the globe renders as the solid `baseColor` set below, which
-        // suits this view anyway - it's a stylized illustrative cutaway, not a photoreal
-        // globe. Terrain is left unset, which defaults to Cesium's token-free
-        // EllipsoidTerrainProvider.
+        // "Rendering has stopped" safety halt.
+        //
+        // Tried CARTO's raster Dark Matter tiles first (same CDN as CommandMap.tsx's
+        // MapLibre basemap) - turns out CARTO's classic raster tile endpoint
+        // (basemaps.cartocdn.com/dark_all/...) now requires an API key, unlike the vector
+        // style JSON the 2D map uses; tiles loaded but rendered as an "API KEY REQUIRED"
+        // watermark. Then tried plain OpenStreetMap tiles (genuinely free/keyless, real
+        // render) - but a street map with roads/place labels doesn't suit a geology app.
+        // Esri's World_Terrain_Base is a free, tokenless ArcGIS basemap (no roads/labels,
+        // shaded-relief/hypsometric terrain styling) - the right fit for a mine-depth
+        // cutaway, and Cesium ships a dedicated provider for it.
+        const worldTerrainBase = await Cesium.ArcGisMapServerImageryProvider.fromUrl(
+          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer",
+        );
         const viewer = new Cesium.Viewer(containerRef.current, {
-          baseLayer: false,
+          baseLayer: new Cesium.ImageryLayer(worldTerrainBase),
           baseLayerPicker: false,
           geocoder: false,
           homeButton: false,
