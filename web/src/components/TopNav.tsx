@@ -30,7 +30,9 @@ export default function TopNav({
       }}
     >
       <Link href="/" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ fontSize: 20 }}>🧭</span>
+        {/* eslint-disable-next-line @next/next/no-img-element -- fixed-size static
+            wordmark icon, not worth next/image's responsive-loading machinery */}
+        <img src="/logo.png" alt="" width={24} height={24} style={{ borderRadius: 6 }} />
         <strong style={{ fontSize: 17, letterSpacing: "0.01em" }}>ORE COMPASS</strong>
       </Link>
 

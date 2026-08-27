@@ -17,6 +17,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 setWorkerUrl("/maplibre-gl-worker.mjs");
 
 import { MapboxOverlay } from "@deck.gl/mapbox";
+import { COORDINATE_SYSTEM } from "@deck.gl/core";
 import type { Layer } from "@deck.gl/core";
 import { BitmapLayer, GeoJsonLayer, ScatterplotLayer, PathLayer, TextLayer } from "@deck.gl/layers";
 import { SimpleMeshLayer } from "@deck.gl/mesh-layers";
@@ -531,6 +532,15 @@ export default function CommandMap({
               },
               indices: { value: terrainMesh.indices, size: 1 },
             },
+            // SimpleMeshLayer's mesh.POSITION values are real [lon, lat, elevation_m] here
+            // (baked absolute coordinates, not offsets from a per-instance getPosition -
+            // there's no getPosition at all, hence _instanced: false). Without this,
+            // coordinateSystem defaults to COORDINATE_SYSTEM.DEFAULT, which for a
+            // non-instanced mesh with no anchor resolves to a local meter/Cartesian frame -
+            // degrees get read as metres, so the ~280km-wide belt mesh renders as a ~280m
+            // speck near [0,0] (null island). That's what "tiny scattered fragments in a
+            // black void" was: the real symptom of this exact deck.gl gotcha.
+            coordinateSystem: COORDINATE_SYSTEM.LNGLAT,
             texture: `/data/${fused.static_image}`,
             _instanced: false,
             getColor: [255, 255, 255, 255],
@@ -667,8 +677,28 @@ export default function CommandMap({
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      {/* MapLibre Canvas Container */}
-      <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+      {/* MapLibre Canvas Container - inset from the sides rather than full-bleed.
+          The floating panels (hero card, Location Inspector, StatCards/DetailDrawer) sit at
+          the left:20/right:20 edges of this same relative wrapper, each up to ~380-400px
+          wide; the map used to render edge-to-edge underneath all of them, which meant a lot
+          of it was hidden behind panel backgrounds rather than actually visible. These
+          margins carve out a center strip that lines up with the gap between the two panel
+          columns instead. MapLibre picks up container resizes on its own (internal
+          ResizeObserver), so this doesn't need any JS-side handling. */}
+      <div
+        ref={containerRef}
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: 420,
+          right: 420,
+          borderRadius: 20,
+          overflow: "hidden",
+          border: "1px solid var(--glass-border)",
+          background: "var(--bg-2)",
+        }}
+      />
 
       {/* SEPARATE COLUMNS LOCATION INSPECTOR PANEL (Top-Left under Headline).
           top/bottom are both set (not just top) so this is a bounded, scrollable box rather

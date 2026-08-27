@@ -84,3 +84,36 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
+
+/* Thin, semi-transparent scrollbars matching the glass-panel theme, everywhere content
+   scrolls (Location Inspector, DetailDrawer's tab body, TargetRail's horizontal rail) -
+   replaces the default OS scrollbar, which was a solid light-gray bar that read as a UI
+   bug sitting on top of a translucent dark panel. color-mix against --ink means the thumb
+   is always a low-opacity version of the current theme's text color, so it stays correct
+   through both the light/dark media-query swap and the manual [data-theme] override without
+   a second copy of these rules. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 25%, transparent) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ink) 25%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ink) 40%, transparent);
+  background-clip: padding-box;
+}
