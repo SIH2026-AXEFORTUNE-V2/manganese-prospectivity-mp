@@ -5,7 +5,8 @@
 // 1. 2D Mode: MapLibre base map + deck.gl BitmapLayer (fused prospectivity score) + GeoJsonLayers (targets & mines).
 // 2. 3D Mode: Georeferenced 3D terrain mesh decoded from terrain.json, draped with the fused prospectivity score,
 //    true-elevation surface mine markers, and subsurface depth plumb-line annotations for underground mines (Balaghat: ▼ 383 m).
-// 3. Live Geospatial Coordinates: Real-time Longitude & Latitude HUD badge, elevation readout, and feature coordinate tooltips.
+// 3. Location Picker & Separate Columns Inspector: Click anywhere in India/Madhya Pradesh on the map or choose a preset
+//    to display Latitude and Longitude in separate columns with elevation, decimal readouts, and copy shortcuts.
 // 4. Dynamic Controls: 2D ⟷ 3D mode switch pill, vertical exaggeration slider (1x to 8x), and interactive tooltips.
 
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
@@ -32,6 +33,25 @@ interface DecodedTerrain {
   max: number;
   heights: Uint16Array;
 }
+
+interface PickedLocation {
+  lat: number;
+  lon: number;
+  elev: number;
+  name?: string;
+  type?: string;
+}
+
+// Preset prominent Indian mining locations in the Sausar Manganese Belt (MP / MH)
+const PRESET_LOCATIONS: Array<{ name: string; lat: number; lon: number; type: string }> = [
+  { name: "Balaghat (Bharveli)", lat: 21.851853, lon: 80.239336, type: "Underground Mine" },
+  { name: "Ukwa", lat: 21.972343, lon: 80.457069, type: "Underground Mine" },
+  { name: "Tirodi", lat: 21.681971, lon: 79.719128, type: "Opencast Mine" },
+  { name: "Dongri Buzurg", lat: 21.543965, lon: 79.676276, type: "Opencast Mine" },
+  { name: "Chikla", lat: 21.53801, lon: 79.74348, type: "Underground Mine" },
+  { name: "Mansar", lat: 21.402786, lon: 79.255341, type: "Underground Mine" },
+  { name: "Munsar", lat: 21.404754, lon: 79.286392, type: "Underground Mine" },
+];
 
 // Decode base64 Uint16Array heightmap from terrain.json (matching decodeTerrain() logic)
 function decodeTerrain(t: TerrainData): DecodedTerrain | null {
@@ -168,6 +188,17 @@ export default function CommandMap({
     object: Record<string, unknown> | null;
   } | null>(null);
 
+  // Picked location state (lat/lon in separate columns)
+  const [pickedLocation, setPickedLocation] = useState<PickedLocation>({
+    lat: 21.851853,
+    lon: 80.239336,
+    elev: 320,
+    name: "Balaghat / Bharveli Mine (Default Focus)",
+    type: "Underground Manganese Mine",
+  });
+
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+
   // Live coordinates state (mouse cursor position and elevation)
   const [cursorCoords, setCursorCoords] = useState<{
     lat: number;
@@ -231,6 +262,45 @@ export default function CommandMap({
     );
   }, [mineData]);
 
+  // Pinned location data for deck.gl layer
+  const pickedPinData = useMemo(() => {
+    if (!pickedLocation) return [];
+    const elev = sampleElevation(pickedLocation.lon, pickedLocation.lat, decodedTerrain);
+    return [
+      {
+        ...pickedLocation,
+        surfaceElevation: elev * (mode === "3d" ? exaggeration : 0),
+      },
+    ];
+  }, [pickedLocation, decodedTerrain, exaggeration, mode]);
+
+  // Handle picking preset locations
+  const handleSelectPreset = (preset: (typeof PRESET_LOCATIONS)[0]) => {
+    const elev = sampleElevation(preset.lon, preset.lat, decodedTerrain);
+    setPickedLocation({
+      lat: preset.lat,
+      lon: preset.lon,
+      elev: Math.round(elev),
+      name: preset.name,
+      type: preset.type,
+    });
+    const map = mapRef.current;
+    if (map) {
+      map.flyTo({
+        center: [preset.lon, preset.lat],
+        zoom: Math.max(9.5, map.getZoom()),
+        duration: 1200,
+      });
+    }
+  };
+
+  // Copy to clipboard helper
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopyFeedback(`Copied ${label}!`);
+    setTimeout(() => setCopyFeedback(null), 2000);
+  };
+
   // Handle 2D <-> 3D view toggle with smooth camera transition
   const toggleMode = useCallback(
     (newMode: "2d" | "3d") => {
@@ -287,6 +357,20 @@ export default function CommandMap({
 
     map.on("error", (e) => console.error("MapLibre error:", e.error));
 
+    // Handle clicking anywhere on the map in India to pick a location
+    map.on("click", (e) => {
+      const lon = e.lngLat.lng;
+      const lat = e.lngLat.lat;
+      const elev = sampleElevation(lon, lat, decodedTerrain);
+      setPickedLocation({
+        lat,
+        lon,
+        elev: Math.round(elev),
+        name: `Custom Location Pin`,
+        type: `Coordinates Picked from Map`,
+      });
+    });
+
     // Track live cursor coordinates and elevation across map moves
     map.on("mousemove", (e) => {
       const lon = e.lngLat.lng;
@@ -302,7 +386,6 @@ export default function CommandMap({
 
     map.on("move", () => {
       const center = map.getCenter();
-      const elev = sampleElevation(center.lng, center.lat, decodedTerrain);
       setCursorCoords((prev) => ({
         ...prev,
         zoom: parseFloat(map.getZoom().toFixed(1)),
@@ -471,13 +554,273 @@ export default function CommandMap({
       }
     }
 
+    // --- PICKED PIN MARKER LAYER (ACTIVE IN BOTH 2D AND 3D) ---
+    if (pickedPinData.length > 0) {
+      layers.push(
+        new ScatterplotLayer({
+          id: "picked-pin-glow",
+          data: pickedPinData,
+          getPosition: (d) => [d.lon, d.lat, (d.surfaceElevation || 0) + 30],
+          getRadius: 700,
+          getFillColor: [200, 255, 61, 70],
+          getLineColor: [200, 255, 61, 255],
+          lineWidthMinPixels: 2,
+          stroked: true,
+          pickable: false,
+        }),
+        new ScatterplotLayer({
+          id: "picked-pin-core",
+          data: pickedPinData,
+          getPosition: (d) => [d.lon, d.lat, (d.surfaceElevation || 0) + 35],
+          getRadius: 260,
+          getFillColor: [200, 255, 61, 255],
+          getLineColor: [20, 21, 15, 255],
+          lineWidthMinPixels: 2.5,
+          stroked: true,
+          pickable: false,
+        }),
+        new TextLayer({
+          id: "picked-pin-label",
+          data: pickedPinData,
+          getPosition: (d) => [d.lon, d.lat, (d.surfaceElevation || 0) + 40],
+          getText: (d) => `📍 ${d.name || "Picked Point"}\n${formatCoordinates(d.lat, d.lon)}`,
+          getSize: 12,
+          getColor: [237, 239, 231, 255],
+          background: true,
+          getBackgroundColor: () => [20, 21, 15, 235],
+          backgroundPadding: [6, 4],
+          getTextAnchor: "middle",
+          getAlignmentBaseline: "bottom",
+          getPixelOffset: [0, -16],
+          fontFamily: "system-ui, -apple-system, sans-serif",
+          fontWeight: 600,
+          characterSet: "auto",
+          pickable: false,
+        }),
+      );
+    }
+
     overlay.setProps({ layers });
-  }, [mode, manifest, targets, mines, terrainMesh, mineData, depthAnnotatedMines]);
+  }, [mode, manifest, targets, mines, terrainMesh, mineData, depthAnnotatedMines, pickedPinData]);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       {/* MapLibre Canvas Container */}
       <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+
+      {/* SEPARATE COLUMNS LOCATION INSPECTOR PANEL (Top-Left under Headline) */}
+      <div
+        style={{
+          position: "absolute",
+          top: 130, // Below "Where to survey next" GlassCard
+          left: 20,
+          maxWidth: 380,
+          zIndex: 10,
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+        }}
+      >
+        <div
+          style={{
+            background: "var(--glass)",
+            border: "1px solid var(--glass-border)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
+            borderRadius: 16,
+            padding: "16px 18px",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.35)",
+            color: "var(--ink)",
+          }}
+        >
+          {/* Panel Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 16, color: "var(--accent-lime)" }}>📍</span>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-dim)" }}>
+                LOCATION INSPECTOR · SEPARATE COLUMNS
+              </span>
+            </div>
+            {copyFeedback && (
+              <span style={{ fontSize: 11, color: "var(--accent-lime)", fontWeight: 600, animation: "fadeIn 0.2s" }}>
+                {copyFeedback}
+              </span>
+            )}
+          </div>
+
+          {/* Location Title & Type */}
+          <div style={{ marginBottom: 12 }}>
+            <strong style={{ fontSize: 15, display: "block", color: "var(--accent-lime)" }}>
+              {pickedLocation.name}
+            </strong>
+            <span style={{ fontSize: 12, color: "var(--ink-dim)" }}>
+              {pickedLocation.type} · Click anywhere on map to pin
+            </span>
+          </div>
+
+          {/* TWO SEPARATE COLUMNS: LATITUDE & LONGITUDE */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+            {/* COLUMN 1: LATITUDE */}
+            <div
+              style={{
+                background: "rgba(20, 21, 15, 0.45)",
+                border: "1px solid var(--glass-border)",
+                borderRadius: 12,
+                padding: "10px 12px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-dim)", letterSpacing: "0.05em" }}>
+                  LATITUDE
+                </span>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(pickedLocation.lat.toFixed(6), "Latitude")}
+                  title="Copy Latitude"
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "var(--ink-dim)",
+                    cursor: "pointer",
+                    fontSize: 11,
+                    padding: 0,
+                  }}
+                >
+                  📋
+                </button>
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
+                {Math.abs(pickedLocation.lat).toFixed(4)}° {pickedLocation.lat >= 0 ? "N" : "S"}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--ink-dim)", fontFamily: "monospace" }}>
+                Dec: {pickedLocation.lat.toFixed(6)}
+              </div>
+            </div>
+
+            {/* COLUMN 2: LONGITUDE */}
+            <div
+              style={{
+                background: "rgba(20, 21, 15, 0.45)",
+                border: "1px solid var(--glass-border)",
+                borderRadius: 12,
+                padding: "10px 12px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-dim)", letterSpacing: "0.05em" }}>
+                  LONGITUDE
+                </span>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(pickedLocation.lon.toFixed(6), "Longitude")}
+                  title="Copy Longitude"
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "var(--ink-dim)",
+                    cursor: "pointer",
+                    fontSize: 11,
+                    padding: 0,
+                  }}
+                >
+                  📋
+                </button>
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
+                {Math.abs(pickedLocation.lon).toFixed(4)}° {pickedLocation.lon >= 0 ? "E" : "W"}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--ink-dim)", fontFamily: "monospace" }}>
+                Dec: {pickedLocation.lon.toFixed(6)}
+              </div>
+            </div>
+          </div>
+
+          {/* ELEVATION & COPY BAR */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "8px 12px",
+              background: "rgba(200, 255, 61, 0.07)",
+              border: "1px solid rgba(200, 255, 61, 0.2)",
+              borderRadius: 10,
+              marginBottom: 12,
+              fontSize: 12,
+            }}
+          >
+            <div>
+              <span style={{ color: "var(--ink-dim)" }}>Sampled Elevation: </span>
+              <strong style={{ color: "var(--accent-lime)", fontFamily: "monospace" }}>
+                {pickedLocation.elev} m ASL
+              </strong>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                copyToClipboard(
+                  `${pickedLocation.lat.toFixed(6)}, ${pickedLocation.lon.toFixed(6)}`,
+                  "Lat, Lon Pair",
+                )
+              }
+              style={{
+                border: "none",
+                background: "var(--accent-lime)",
+                color: "var(--chip-dark)",
+                borderRadius: 6,
+                padding: "4px 10px",
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Copy Lat/Lon
+            </button>
+          </div>
+
+          {/* Quick-Pick Preset Mining Belt Locations in India */}
+          <div>
+            <div style={{ fontSize: 11, color: "var(--ink-dim)", fontWeight: 600, marginBottom: 6 }}>
+              QUICK-PICK MINING LOCATIONS (INDIA / MP):
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {PRESET_LOCATIONS.map((loc) => (
+                <button
+                  key={loc.name}
+                  type="button"
+                  onClick={() => handleSelectPreset(loc)}
+                  style={{
+                    border: "1px solid var(--glass-border)",
+                    borderRadius: 999,
+                    padding: "4px 10px",
+                    fontSize: 11,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    background:
+                      pickedLocation.name === loc.name
+                        ? "rgba(200, 255, 61, 0.2)"
+                        : "rgba(20, 21, 15, 0.3)",
+                    color: pickedLocation.name === loc.name ? "var(--accent-lime)" : "var(--ink)",
+                    borderColor:
+                      pickedLocation.name === loc.name
+                        ? "var(--accent-lime)"
+                        : "var(--glass-border)",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {loc.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Live Longitude & Latitude HUD Badge (Bottom-Left above target rail) */}
       <div
