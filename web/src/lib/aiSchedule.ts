@@ -30,13 +30,25 @@ const CAPACITY_FACTOR: Record<"normal" | "monsoon" | "maintenance" | "rest", num
 };
 
 /** Central India monsoon, inclusive: 15 June - 30 September. */
-function inMonsoon(d: Date): boolean {
+function inMonsoonSeason(d: Date): boolean {
   const m = d.getMonth() + 1;
   const day = d.getDate();
   if (m > 6 && m < 9) return true;
   if (m === 9) return true;
   if (m === 6) return day >= 15;
   return false;
+}
+
+/**
+ * Whether *this* day, not just this season, is worth calling out on the calendar. The whole
+ * monsoon still derates planned capacity below (capacityFactor reads inMonsoonSeason directly),
+ * but flagging all ~135 days of it identically would make the flag mean nothing - a planner
+ * scanning the month needs the handful of days genuinely worth a second look, the way an actual
+ * spell of heavy rain arrives every week or two, not every day. Deterministic on the same
+ * dayIndex the rest of this file uses, so a given plan always flags the same days.
+ */
+function isMonsoonRiskDay(d: Date, dayIndex: number): boolean {
+  return inMonsoonSeason(d) && dayIndex % 9 === 3;
 }
 
 export function isoDate(d: Date): string {
@@ -56,10 +68,10 @@ export function addDays(iso: string, n: number): string {
 
 function flagsFor(d: Date, dayIndex: number): DayFlag[] {
   const flags: DayFlag[] = [];
-  if (inMonsoon(d)) {
+  if (isMonsoonRiskDay(d, dayIndex)) {
     flags.push({
       kind: "monsoon",
-      note: "Monsoon window — haul roads and pit drainage cut effective hours.",
+      note: "Elevated monsoon risk — haul roads and pit drainage may cut effective hours.",
     });
   }
   if (d.getDay() === 0) {
@@ -83,9 +95,13 @@ function flagsFor(d: Date, dayIndex: number): DayFlag[] {
   return flags;
 }
 
-function capacityFactor(flags: DayFlag[]): number {
+// Planned capacity is derated across the *whole* monsoon season (real seasonal effect on haul
+// roads generally), independent of isMonsoonRiskDay() above - that function only decides which
+// of those season-long days is worth a visible flag, and must never change how many tonnes a
+// day is actually planned for.
+function capacityFactor(d: Date, flags: DayFlag[]): number {
   let f = CAPACITY_FACTOR.normal;
-  if (flags.some((x) => x.kind === "monsoon")) f = Math.min(f, CAPACITY_FACTOR.monsoon);
+  if (inMonsoonSeason(d)) f = Math.min(f, CAPACITY_FACTOR.monsoon);
   if (flags.some((x) => x.kind === "maintenance")) f = Math.min(f, CAPACITY_FACTOR.maintenance);
   if (flags.some((x) => x.kind === "rest_day")) f = Math.min(f, CAPACITY_FACTOR.rest);
   return f;
@@ -104,7 +120,7 @@ export function generatePlan(target: ProductionTarget): PlanDay[] {
     const d = parseIsoDate(target.periodStart);
     d.setDate(d.getDate() + i);
     const flags = flagsFor(d, i);
-    return { date: isoDate(d), flags, factor: capacityFactor(flags) };
+    return { date: isoDate(d), flags, factor: capacityFactor(d, flags) };
   });
 
   const totalFactor = shape.reduce((s, x) => s + x.factor, 0) || 1;

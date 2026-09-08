@@ -17,6 +17,7 @@ import { buildSuggestions } from "@/lib/aiSuggestions";
 import { zoneColorFamily, PIN_COLOR_HEX } from "@/lib/aiZones";
 import type { FeatureCollectionLike, TargetProperties } from "@/lib/contract";
 import type { ZonePin } from "@/components/CommandMap";
+import type { HexZoneMarker } from "@/components/MnHexMap";
 
 // maplibre-gl touches `window` on instantiation, so the map is browser-only - same
 // `ssr: false` dynamic import the Explore screen uses.
@@ -59,6 +60,11 @@ export default function ProjectZonesPage() {
           }))
         : [],
     [project],
+  );
+  // Same numbers/colours, reshaped for MnHexMap's h3-cell matching (see HexZoneMarker).
+  const hexZoneMarkers: HexZoneMarker[] = useMemo(
+    () => zonePins.map((z) => ({ order: z.order, sourceRank: z.rank, colorHex: z.colorHex })),
+    [zonePins],
   );
 
   if (!project) return null;
@@ -132,6 +138,7 @@ export default function ProjectZonesPage() {
               targets={targets}
               mines={mines}
               terrain={terrain}
+              zoneMarkers={hexZoneMarkers}
             />
           ) : (
             <CommandMap manifest={manifest} targets={aoiTargets} mines={mines} terrain={terrain} zonePins={zonePins} />
@@ -188,6 +195,7 @@ export default function ProjectZonesPage() {
                 onSelect={() => setSelectedZoneId((prev) => (prev === z.id ? null : z.id))}
                 thumbnailImage={thumbnailImage}
                 manifestBounds={fusedLayer?.bounds}
+                cutawayHref={`/projects/${project.id}/cutaway/${z.id}`}
               />
             ))}
           </div>

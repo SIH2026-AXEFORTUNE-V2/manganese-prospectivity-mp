@@ -9,7 +9,8 @@
 
 import { useState } from "react";
 import type { CSSProperties } from "react";
-import { TriangleAlert, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { TriangleAlert, ChevronRight, Box } from "lucide-react";
 import GlassCard from "./GlassCard";
 import { zoneColorFamily, PIN_COLOR_HEX } from "@/lib/aiZones";
 import type { Confidence, GradeBand, Zone } from "@/lib/projectTypes";
@@ -36,6 +37,7 @@ export default function ZoneCard({
   onRecordOutcome,
   thumbnailImage,
   manifestBounds,
+  cutawayHref,
 }: {
   zone: Zone;
   selected: boolean;
@@ -45,6 +47,8 @@ export default function ZoneCard({
    *  than inventing a fake satellite photo per zone. */
   thumbnailImage?: string;
   manifestBounds?: LatLonBounds;
+  /** This zone's own underground cutaway - `/projects/<id>/cutaway/<zone.id>`. */
+  cutawayHref?: string;
 }) {
   const [showBasis, setShowBasis] = useState(false);
   const family = zoneColorFamily(zone.gradeBand, zone.confidence);
@@ -114,10 +118,15 @@ export default function ZoneCard({
         )}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, borderTop: "1px solid var(--rule)", padding: "10px 16px 16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, borderTop: "1px solid var(--rule)", padding: "10px 16px 16px", flexWrap: "wrap" }}>
         <button type="button" onClick={() => setShowBasis((s) => !s)} style={{ ...linkBtn, display: "inline-flex", alignItems: "center", gap: 3 }}>
           {showBasis ? "Hide basis" : "How was this derived?"} <ChevronRight size={12} style={{ transform: showBasis ? "rotate(90deg)" : undefined, transition: "transform 0.15s" }} />
         </button>
+        {cutawayHref && (
+          <Link href={cutawayHref} style={{ ...linkBtn, display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "none" }}>
+            <Box size={12} /> Underground cutaway
+          </Link>
+        )}
         {onRecordOutcome && (
           <button type="button" onClick={onRecordOutcome} style={{ ...linkBtn, marginLeft: "auto" }}>
             Record mined result

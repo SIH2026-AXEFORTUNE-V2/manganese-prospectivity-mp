@@ -175,6 +175,23 @@ function depthToOre(surfaceElevM: number, datum: OreDatum | null): number | null
   return Math.round(REGOLITH_COVER_M + Math.max(0, surfaceElevM - datum.elevM));
 }
 
+/**
+ * Same depth-to-ore estimate as a hex cell gets, for one arbitrary point rather than a whole
+ * raster - what the per-zone cutaway view datums its shaft against. Reuses nearestDatum() and
+ * depthToOre() so a zone's cutaway can never quote a different depth than the hexagon sitting
+ * on the same ground would.
+ */
+export function estimateDepth(
+  lat: number,
+  lon: number,
+  mines: FeatureCollectionLike | null,
+  terrain: DecodedTerrain | null,
+): { surfaceElevM: number; depthToOreM: number | null; datum: OreDatum | null } {
+  const surfaceElevM = Math.round(sampleElevation(lon, lat, terrain));
+  const datum = nearestDatum(lat, lon, mines, terrain);
+  return { surfaceElevM, depthToOreM: depthToOre(surfaceElevM, datum), datum };
+}
+
 function nearestDatum(
   lat: number,
   lon: number,

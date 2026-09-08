@@ -69,6 +69,17 @@ function fmtKt(kt: number): string {
   return `${Math.round(kt).toLocaleString()} kt`;
 }
 
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.replace("#", ""), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+export interface HexZoneMarker {
+  order: number;
+  sourceRank: number;
+  colorHex: string;
+}
+
 export default function MnHexMap({
   bbox,
   aoiName,
@@ -76,6 +87,7 @@ export default function MnHexMap({
   targets,
   mines,
   terrain,
+  zoneMarkers,
 }: {
   bbox: LatLonBounds;
   aoiName: string;
@@ -83,6 +95,11 @@ export default function MnHexMap({
   targets: FeatureCollectionLike | null;
   mines: FeatureCollectionLike | null;
   terrain: TerrainData | null;
+  /** When given, the grid draws only the hexagon each ranked zone's target actually falls in -
+   *  matching the numbered pins the Prospectivity map shows for the same zones, rather than
+   *  every anomalous block in the AOI. Matched by MnHexCell.targetRank, so a hexagon is only
+   *  ever shown for ground the pipeline actually ranked, never a nearest-neighbour guess. */
+  zoneMarkers?: HexZoneMarker[];
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -142,8 +159,32 @@ export default function MnHexMap({
     });
   }, [grid, calibration, bbox, resolution, mines, targets, decodedTerrain]);
 
-  const cells = result?.cells ?? [];
+  // A stable empty-array identity when there's no result yet, so the useMemo hooks below it
+  // don't re-run every render on a freshly-allocated `[]`.
+  const cells = useMemo(() => result?.cells ?? [], [result]);
   const maxKt = useMemo(() => Math.max(1, ...cells.map((c) => c.tonnesKt)), [cells]);
+
+  // Zone-matched order/colour per cell, keyed by h3 - a cell only gets an entry when a ranked
+  // zone's target actually falls inside it (MnHexCell.targetRank), not by nearest-distance.
+  const markerByH3 = useMemo(() => {
+    if (!zoneMarkers || zoneMarkers.length === 0) return null;
+    const byRank = new Map(zoneMarkers.map((z) => [z.sourceRank, z]));
+    const m = new Map<string, HexZoneMarker>();
+    for (const c of cells) {
+      if (c.targetRank === null) continue;
+      const marker = byRank.get(c.targetRank);
+      if (marker) m.set(c.h3, marker);
+    }
+    return m;
+  }, [zoneMarkers, cells]);
+
+  // With zoneMarkers given, the map surface shows only the ranked zones' own hexagons - the
+  // same reduction the Prospectivity map's numbered pins make - while the stats panel below
+  // keeps reporting the true AOI-wide totals (see the caption near "Blocks with ore").
+  const displayCells = useMemo(() => {
+    if (!markerByH3) return cells;
+    return cells.filter((c) => markerByH3.has(c.h3));
+  }, [cells, markerByH3]);
 
   /* ------------------------------------------------------------------- the map -- */
 
@@ -222,7 +263,7 @@ export default function MnHexMap({
     const layers: Layer[] = [
       new H3HexagonLayer<MnHexCell>({
         id: "mn-hex",
-        data: cells,
+        data: displayCells,
         getHexagon: (d) => d.h3,
         extruded: extrude,
         elevationScale: 1,
@@ -231,9 +272,13 @@ export default function MnHexMap({
         getElevation: (d) => (extrude ? (d.tonnesKt / maxKt) * 5000 : 0),
         getFillColor: (d) =>
           rampColor(d.tonnesKt / maxKt, selected && selected.h3 === d.h3 ? 255 : 205),
-        getLineColor: (d) =>
-          selected && selected.h3 === d.h3 ? [200, 255, 61, 255] : [255, 255, 255, 40],
-        getLineWidth: (d) => (selected && selected.h3 === d.h3 ? 3 : 1),
+        getLineColor: (d) => {
+          if (selected && selected.h3 === d.h3) return [200, 255, 61, 255];
+          const marker = markerByH3?.get(d.h3);
+          if (marker) return [...hexToRgb(marker.colorHex), 255];
+          return [255, 255, 255, 40];
+        },
+        getLineWidth: (d) => (selected && selected.h3 === d.h3 ? 3 : markerByH3?.has(d.h3) ? 2.5 : 1),
         lineWidthUnits: "pixels",
         stroked: true,
         filled: true,
@@ -247,8 +292,8 @@ export default function MnHexMap({
         },
         updateTriggers: {
           getFillColor: [maxKt, selected?.h3],
-          getLineColor: [selected?.h3],
-          getLineWidth: [selected?.h3],
+          getLineColor: [selected?.h3, markerByH3],
+          getLineWidth: [selected?.h3, markerByH3],
           getElevation: [extrude, maxKt],
         },
       }),
@@ -256,28 +301,36 @@ export default function MnHexMap({
 
     // Labels are the thing that makes the grid readable at a glance, and also the first thing
     // to turn into mush - past a few hundred cells they overlap into noise, so they switch off.
-    if (showLabels && cells.length <= 350) {
+    // A zone-matched cell always labels with its order number (ties it to the card/pin sharing
+    // that number) rather than tonnage, which the click-to-inspect panel still shows in full.
+    if (showLabels && displayCells.length <= 350) {
       layers.push(
         new TextLayer<MnHexCell>({
           id: "mn-hex-labels",
-          data: cells,
+          data: displayCells,
           getPosition: (d) => [d.lon, d.lat],
-          getText: (d) => (d.tonnesKt >= 1000 ? `${(d.tonnesKt / 1000).toFixed(1)}M` : String(Math.round(d.tonnesKt))),
-          getSize: 12,
+          getText: (d) => {
+            const marker = markerByH3?.get(d.h3);
+            if (marker) return String(marker.order);
+            return d.tonnesKt >= 1000 ? `${(d.tonnesKt / 1000).toFixed(1)}M` : String(Math.round(d.tonnesKt));
+          },
+          getSize: (d) => (markerByH3?.has(d.h3) ? 20 : 12),
           getColor: [255, 255, 255, 230],
           outlineColor: [0, 0, 0, 255],
           outlineWidth: 3,
           fontSettings: { sdf: true },
+          fontWeight: 800,
           getTextAnchor: "middle",
           getAlignmentBaseline: "center",
           billboard: true,
           parameters: { depthCompare: "always" },
+          updateTriggers: { getText: [markerByH3], getSize: [markerByH3] },
         }),
       );
     }
 
     overlay.setProps({ layers });
-  }, [cells, extrude, maxKt, selected, showLabels, onClickCell]);
+  }, [displayCells, extrude, maxKt, selected, showLabels, onClickCell, markerByH3]);
 
   /* ------------------------------------------------------------------ rendering -- */
 
@@ -307,6 +360,12 @@ export default function MnHexMap({
               <Metric label="Indicative in situ" value={fmtKt(result.totalTonnesKt)} />
               <Metric label="H3 resolution" value={String(result.resolution)} />
             </div>
+            {markerByH3 && (
+              <div style={{ ...dim, marginTop: 8, lineHeight: 1.5 }}>
+                Showing the {displayCells.length} block{displayCells.length === 1 ? "" : "s"} the ranked zones below actually
+                fall in, out of {result.cells.length} with ore-grade anomaly in this AOI.
+              </div>
+            )}
 
             <div style={{ ...eyebrow, marginTop: 14 }}>Detail</div>
             <Segmented

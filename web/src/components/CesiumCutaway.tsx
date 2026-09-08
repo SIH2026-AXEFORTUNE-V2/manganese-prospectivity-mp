@@ -1,19 +1,52 @@
 "use client";
 
-// Issue #8: Cesium Cutaway View for Balaghat Mine (-383 m depth)
+// Issue #8: Cesium Cutaway View, generalised from a single hardcoded Balaghat view into one
+// reusable per-location component - docs/issues/09-project-workspace-flow.md §3b.
 //
-// Standalone underground 3D cutaway view scoped to Balaghat mine.
-// Displays Longitude, Latitude, Surface Altitude (+320 m ASL), and Subsurface Altitude (-63 m BSL) in separate columns.
-// Demonstrates subterranean shaft depth (-383 m) below the real terrain surface.
-// Clearly labelled as illustrative depth, not an actual mine plan.
+// Standalone underground 3D cutaway view for any surface point + depth-to-ore pair. Displays
+// Longitude, Latitude, Surface Altitude and Subsurface Altitude in separate columns, and an
+// extruded shaft down to the estimated depth. Every number here traces back to either the
+// pipeline's own terrain sample (surface altitude) or estimateDepth() in lib/mnHexGrid.ts (the
+// same datum-interpolation the Mn hex grid uses) - a zone's cutaway can never show a different
+// depth figure than the hexagon sitting on the same ground. Clearly labelled as illustrative
+// depth, not an actual engineering mine plan - real Sausar bands fold and plunge.
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import { Copy, Box, ArrowDown, ArrowLeft, Layers, TriangleAlert, Camera } from "lucide-react";
 import GlassCard from "./GlassCard";
 import Link from "next/link";
 
-export default function CesiumCutaway() {
+const DEFAULT_GEO = {
+  name: "Balaghat / Bharveli Manganese Mine",
+  lat: 21.851853,
+  lon: 80.239336,
+  surfaceAltitude: 320.0,
+  depthMeters: 383.0,
+};
+
+export interface CesiumCutawayProps {
+  name?: string;
+  lat?: number;
+  lon?: number;
+  /** Surface collar altitude, m ASL - real terrain sample when the caller has one. */
+  surfaceAltitude?: number;
+  /** Estimated vertical depth to ore, m - real datum-interpolated figure when available. */
+  depthMeters?: number;
+  /** Where "Back to Map View" returns to - a project's Zones page when opened from a zone. */
+  backHref?: string;
+  backLabel?: string;
+}
+
+export default function CesiumCutaway({
+  name = DEFAULT_GEO.name,
+  lat = DEFAULT_GEO.lat,
+  lon = DEFAULT_GEO.lon,
+  surfaceAltitude = DEFAULT_GEO.surfaceAltitude,
+  depthMeters = DEFAULT_GEO.depthMeters,
+  backHref = "/",
+  backLabel = "Back to Map View",
+}: CesiumCutawayProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<any>(null);
 
@@ -21,7 +54,8 @@ export default function CesiumCutaway() {
   const [error, setError] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
-  // Live Camera Telemetry state
+  const bottomAltitude = surfaceAltitude - depthMeters;
+
   const [cameraTelemetry, setCameraTelemetry] = useState<{
     lat: number;
     lon: number;
@@ -29,22 +63,12 @@ export default function CesiumCutaway() {
     heading: number;
     pitch: number;
   }>({
-    lat: 21.842,
-    lon: 80.252,
-    alt: 950,
+    lat,
+    lon,
+    alt: surfaceAltitude + 630,
     heading: 310,
     pitch: -22,
   });
-
-  // Balaghat Mine Telemetry Data
-  const BALAGHAT_GEO = {
-    name: "Balaghat / Bharveli Manganese Mine",
-    lat: 21.851853,
-    lon: 80.239336,
-    surfaceAltitude: 320.0,    // Surface collar altitude above sea level (+320 m ASL)
-    depthMeters: 383.0,        // Sourced vertical shaft depth (383 m)
-    bottomAltitude: -63.0,     // Bottom working level altitude relative to sea level (-63 m BSL)
-  };
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -52,43 +76,37 @@ export default function CesiumCutaway() {
     setTimeout(() => setCopyFeedback(null), 2000);
   };
 
-  // Fly Camera Viewpoints
-  const flyToPerspective = useCallback((type: "cutaway" | "collar" | "subsurface") => {
-    const viewer = viewerRef.current;
-    if (!viewer || !viewer.camera) return;
+  // Fly Camera Viewpoints - offsets are relative to the collar, not absolute Balaghat
+  // coordinates, so the same three perspectives work for any zone's cutaway.
+  const flyToPerspective = useCallback(
+    (type: "cutaway" | "collar" | "subsurface") => {
+      const viewer = viewerRef.current;
+      if (!viewer || !viewer.camera) return;
+      const Cesium = (window as any).Cesium;
+      if (!Cesium) return;
 
-    if (type === "cutaway") {
-      viewer.camera.flyTo({
-        destination: (window as any).Cesium.Cartesian3.fromDegrees(80.252, 21.842, 950),
-        orientation: {
-          heading: (window as any).Cesium.Math.toRadians(310),
-          pitch: (window as any).Cesium.Math.toRadians(-22),
-          roll: 0.0,
-        },
-        duration: 1.2,
-      });
-    } else if (type === "collar") {
-      viewer.camera.flyTo({
-        destination: (window as any).Cesium.Cartesian3.fromDegrees(80.239336, 21.851853, 700),
-        orientation: {
-          heading: (window as any).Cesium.Math.toRadians(0),
-          pitch: (window as any).Cesium.Math.toRadians(-75),
-          roll: 0.0,
-        },
-        duration: 1.2,
-      });
-    } else if (type === "subsurface") {
-      viewer.camera.flyTo({
-        destination: (window as any).Cesium.Cartesian3.fromDegrees(80.246, 21.848, 120),
-        orientation: {
-          heading: (window as any).Cesium.Math.toRadians(305),
-          pitch: (window as any).Cesium.Math.toRadians(-8),
-          roll: 0.0,
-        },
-        duration: 1.2,
-      });
-    }
-  }, []);
+      if (type === "cutaway") {
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(lon + 0.0127, lat - 0.0099, surfaceAltitude + 630),
+          orientation: { heading: Cesium.Math.toRadians(310), pitch: Cesium.Math.toRadians(-22), roll: 0.0 },
+          duration: 1.2,
+        });
+      } else if (type === "collar") {
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(lon, lat, surfaceAltitude + 380),
+          orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-75), roll: 0.0 },
+          duration: 1.2,
+        });
+      } else if (type === "subsurface") {
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(lon + 0.0067, lat - 0.0039, Math.max(80, bottomAltitude + 183)),
+          orientation: { heading: Cesium.Math.toRadians(305), pitch: Cesium.Math.toRadians(-8), roll: 0.0 },
+          duration: 1.2,
+        });
+      }
+    },
+    [lat, lon, surfaceAltitude, bottomAltitude],
+  );
 
   useEffect(() => {
     let viewerInstance: any = null;
@@ -98,15 +116,12 @@ export default function CesiumCutaway() {
       if (!containerRef.current) return;
 
       try {
-        // Set Cesium base URL for static assets (workers, widgets, third-party)
         (window as any).CESIUM_BASE_URL = "/cesium";
 
         const Cesium = await import("cesium");
         (window as any).Cesium = Cesium;
 
         if (destroyed || !containerRef.current) return;
-
-        const { lat, lon, surfaceAltitude, depthMeters, bottomAltitude } = BALAGHAT_GEO;
 
         // Create Cesium Viewer. No baseLayer override - Cesium falls back to its own
         // shipped-in-the-package demo ion access token, which serves real Cesium World
@@ -115,14 +130,6 @@ export default function CesiumCutaway() {
         // token" notice at the bottom of the viewer - that's an informational nag about the
         // shared demo token's limits for production use, not an error; it does not block
         // rendering. Get a free personal ion token (cesium.com) before any real deployment.
-        //
-        // Earlier attempts to avoid ion entirely (CARTO raster - now requires its own API
-        // key; OpenStreetMap - free but a street map doesn't suit a geology app; Esri
-        // World_Terrain_Base - free relief shading, no satellite detail) turned out to be
-        // solving the wrong problem. The actual cause of the original "Rendering has
-        // stopped" crash was Cesium's own static assets (Workers/Assets/ThirdParty) never
-        // being copied to public/cesium/ (see scripts/copy-cesium-assets.mjs) - once that
-        // was fixed, the default ion imagery works cleanly with no other changes needed.
         const viewer = new Cesium.Viewer(containerRef.current, {
           baseLayerPicker: false,
           geocoder: false,
@@ -138,7 +145,6 @@ export default function CesiumCutaway() {
         viewerInstance = viewer;
         viewerRef.current = viewer;
 
-        // Enable subterranean / underground rendering & globe translucency
         const globe = viewer.scene.globe;
         globe.depthTestAgainstTerrain = true;
         globe.translucency.enabled = true;
@@ -146,12 +152,11 @@ export default function CesiumCutaway() {
         globe.translucency.backFaceAlpha = 0.28;
         globe.baseColor = Cesium.Color.fromCssColorString("#14150f");
 
-        // Allow camera to move below ground surface
         viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
 
         // 1. Surface Mine Collar Marker & Altitude Label
         viewer.entities.add({
-          name: "Balaghat Surface Mine Collar (Bharveli)",
+          name: `${name} - surface collar`,
           position: Cesium.Cartesian3.fromDegrees(lon, lat, surfaceAltitude),
           point: {
             pixelSize: 14,
@@ -164,7 +169,7 @@ export default function CesiumCutaway() {
             // Cesium renders this to a bitmap billboard, not the DOM - no React icon can
             // appear here, so it stays plain text (see the deck.gl TextLayer note in
             // CommandMap.tsx for the same constraint).
-            text: `Balaghat Mine Collar (Bharveli)\n${lat.toFixed(4)}° N, ${lon.toFixed(4)}° E\nSurface Altitude: +${surfaceAltitude.toFixed(1)} m ASL`,
+            text: `${name}\n${lat.toFixed(4)}° N, ${lon.toFixed(4)}° E\nSurface Altitude: +${surfaceAltitude.toFixed(1)} m ASL`,
             font: "12px system-ui, sans-serif",
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
             fillColor: Cesium.Color.fromCssColorString("#edefe7"),
@@ -178,10 +183,10 @@ export default function CesiumCutaway() {
           },
         });
 
-        // 2. Extruded Vertical Main Shaft Geometry (Depth -383 m)
+        // 2. Extruded Vertical Shaft Geometry, down to the estimated depth-to-ore
         const shaftMidElev = surfaceAltitude - depthMeters / 2;
         viewer.entities.add({
-          name: "Vertical Production Shaft (-383 m)",
+          name: `Vertical shaft (-${depthMeters.toFixed(0)} m)`,
           position: Cesium.Cartesian3.fromDegrees(lon, lat, shaftMidElev),
           cylinder: {
             length: depthMeters,
@@ -194,17 +199,15 @@ export default function CesiumCutaway() {
           },
         });
 
-        // 3. Staging Altitude Depth Ticks along Shaft (-100m, -200m, -300m)
-        const depthTicks = [
-          { depth: 100, alt: surfaceAltitude - 100, label: "-100 m Depth (Alt: +220 m ASL)" },
-          { depth: 200, alt: surfaceAltitude - 200, label: "-200 m Depth (Alt: +120 m ASL)" },
-          { depth: 300, alt: surfaceAltitude - 300, label: "-300 m Depth (Alt: +20 m ASL)" },
-        ];
-
-        depthTicks.forEach((tick) => {
+        // 3. Staging depth ticks at quarter/half/three-quarter depth, scaled to this shaft -
+        // fixed -100/-200/-300 m only made sense for Balaghat's own 383 m shaft.
+        const tickFractions = [0.25, 0.5, 0.75];
+        tickFractions.forEach((frac) => {
+          const depth = Math.round((depthMeters * frac) / 10) * 10;
+          const alt = surfaceAltitude - depth;
           viewer.entities.add({
-            name: tick.label,
-            position: Cesium.Cartesian3.fromDegrees(lon, lat, tick.alt),
+            name: `-${depth} m depth tick`,
+            position: Cesium.Cartesian3.fromDegrees(lon, lat, alt),
             cylinder: {
               length: 2.0,
               topRadius: 45.0,
@@ -215,7 +218,7 @@ export default function CesiumCutaway() {
               outlineWidth: 1,
             },
             label: {
-              text: `── ${tick.label}`,
+              text: `-${depth} m depth (Alt: ${alt >= 0 ? "+" : ""}${Math.round(alt)} m ASL)`,
               font: "11px system-ui, sans-serif",
               style: Cesium.LabelStyle.FILL_AND_OUTLINE,
               fillColor: Cesium.Color.fromCssColorString("#9aa08c"),
@@ -231,9 +234,9 @@ export default function CesiumCutaway() {
           });
         });
 
-        // 4. Illustrative Subsurface Working Level Disk (-383 m Sourced Depth)
+        // 4. Illustrative subsurface working-level disk at the full estimated depth
         viewer.entities.add({
-          name: "Subsurface Working Level (-383 m)",
+          name: `Subsurface working level (-${depthMeters.toFixed(0)} m)`,
           position: Cesium.Cartesian3.fromDegrees(lon, lat, bottomAltitude),
           cylinder: {
             length: 10.0,
@@ -245,7 +248,7 @@ export default function CesiumCutaway() {
             outlineWidth: 2,
           },
           label: {
-            text: `▼ SUBTERRANEAN WORKING LEVEL\nAltitude: ${bottomAltitude.toFixed(1)} m BSL (Sub-Sea Datum)\nSourced Shaft Depth: −${depthMeters.toFixed(0)} m\n(Illustrative depth — not actual engineering mine plan)`,
+            text: `SUBTERRANEAN WORKING LEVEL\nAltitude: ${bottomAltitude.toFixed(1)} m ${bottomAltitude < 0 ? "BSL" : "ASL"}\nEstimated depth to ore: -${depthMeters.toFixed(0)} m\n(Illustrative depth - not actual engineering mine plan)`,
             font: "bold 12px system-ui, sans-serif",
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
             fillColor: Cesium.Color.fromCssColorString("#c8ff3d"),
@@ -261,7 +264,7 @@ export default function CesiumCutaway() {
 
         // 5. Centerline Depth Plumb Line
         viewer.entities.add({
-          name: "Shaft Centerline",
+          name: "Shaft centerline",
           polyline: {
             positions: [
               Cesium.Cartesian3.fromDegrees(lon, lat, surfaceAltitude),
@@ -275,7 +278,6 @@ export default function CesiumCutaway() {
           },
         });
 
-        // Camera move listener to update live camera altitude
         viewer.camera.changed.addEventListener(() => {
           const carto = viewer.camera.positionCartographic;
           if (carto) {
@@ -289,14 +291,10 @@ export default function CesiumCutaway() {
           }
         });
 
-        // Fly camera to isometric cutaway perspective
+        // Fly camera to isometric cutaway perspective on load
         viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(80.252, 21.842, 950),
-          orientation: {
-            heading: Cesium.Math.toRadians(310),
-            pitch: Cesium.Math.toRadians(-22),
-            roll: 0.0,
-          },
+          destination: Cesium.Cartesian3.fromDegrees(lon + 0.0127, lat - 0.0099, surfaceAltitude + 630),
+          orientation: { heading: Cesium.Math.toRadians(310), pitch: Cesium.Math.toRadians(-22), roll: 0.0 },
           duration: 1.5,
         });
 
@@ -316,6 +314,9 @@ export default function CesiumCutaway() {
         viewerInstance.destroy();
       }
     };
+    // Mount-once: the scene is built from these props at init time. A different zone renders
+    // through a fresh mount (the caller keys the component on zone id), not a live prop swap.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -346,35 +347,21 @@ export default function CesiumCutaway() {
             )}
           </div>
 
-          <h2 style={{ fontSize: 20, fontWeight: 700, margin: "2px 0 6px" }}>
-            Balaghat Mine (Bharveli)
-          </h2>
+          <h2 style={{ fontSize: 20, fontWeight: 700, margin: "2px 0 6px" }}>{name}</h2>
 
           <p style={{ fontSize: 12, color: "var(--ink-dim)", margin: "0 0 12px", lineHeight: 1.4 }}>
-            Subterranean cutaway visualizing the <strong>−383 m</strong> vertical production shaft reaching below sea level.
+            Subterranean cutaway visualizing the <strong>−{depthMeters.toFixed(0)} m</strong> estimated depth to ore below surface.
           </p>
 
           {/* SEPARATE COLUMNS: LONGITUDE, LATITUDE & ALTITUDES */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
             {/* COLUMN 1: LONGITUDE */}
-            <div
-              style={{
-                background: "rgba(20, 21, 15, 0.5)",
-                border: "1px solid var(--glass-border)",
-                borderRadius: 10,
-                padding: "8px 10px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 2,
-              }}
-            >
+            <div style={geoCol}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 10, fontWeight: 600, color: "var(--ink-dim)", letterSpacing: "0.05em" }}>
-                  LONGITUDE
-                </span>
+                <span style={geoColLabel}>LONGITUDE</span>
                 <button
                   type="button"
-                  onClick={() => copyToClipboard(BALAGHAT_GEO.lon.toFixed(6), "Longitude")}
+                  onClick={() => copyToClipboard(lon.toFixed(6), "Longitude")}
                   title="Copy Longitude"
                   style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, display: "flex" }}
                 >
@@ -382,32 +369,18 @@ export default function CesiumCutaway() {
                 </button>
               </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
-                80.2393° E
+                {lon.toFixed(4)}° E
               </div>
-              <div style={{ fontSize: 10, color: "var(--ink-dim)", fontFamily: "monospace" }}>
-                Dec: {BALAGHAT_GEO.lon.toFixed(6)}
-              </div>
+              <div style={{ fontSize: 10, color: "var(--ink-dim)", fontFamily: "monospace" }}>Dec: {lon.toFixed(6)}</div>
             </div>
 
             {/* COLUMN 2: LATITUDE */}
-            <div
-              style={{
-                background: "rgba(20, 21, 15, 0.5)",
-                border: "1px solid var(--glass-border)",
-                borderRadius: 10,
-                padding: "8px 10px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 2,
-              }}
-            >
+            <div style={geoCol}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 10, fontWeight: 600, color: "var(--ink-dim)", letterSpacing: "0.05em" }}>
-                  LATITUDE
-                </span>
+                <span style={geoColLabel}>LATITUDE</span>
                 <button
                   type="button"
-                  onClick={() => copyToClipboard(BALAGHAT_GEO.lat.toFixed(6), "Latitude")}
+                  onClick={() => copyToClipboard(lat.toFixed(6), "Latitude")}
                   title="Copy Latitude"
                   style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, display: "flex" }}
                 >
@@ -415,35 +388,21 @@ export default function CesiumCutaway() {
                 </button>
               </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
-                21.8519° N
+                {lat.toFixed(4)}° N
               </div>
-              <div style={{ fontSize: 10, color: "var(--ink-dim)", fontFamily: "monospace" }}>
-                Dec: {BALAGHAT_GEO.lat.toFixed(6)}
-              </div>
+              <div style={{ fontSize: 10, color: "var(--ink-dim)", fontFamily: "monospace" }}>Dec: {lat.toFixed(6)}</div>
             </div>
           </div>
 
           {/* SEPARATE COLUMNS: SURFACE ALTITUDE & SUBTERRANEAN ALTITUDE */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
             {/* COLUMN 3: SURFACE ALTITUDE */}
-            <div
-              style={{
-                background: "rgba(20, 21, 15, 0.5)",
-                border: "1px solid var(--glass-border)",
-                borderRadius: 10,
-                padding: "8px 10px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 2,
-              }}
-            >
+            <div style={geoCol}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 10, fontWeight: 600, color: "var(--ink-dim)", letterSpacing: "0.05em" }}>
-                  SURFACE ALTITUDE
-                </span>
+                <span style={geoColLabel}>SURFACE ALTITUDE</span>
                 <button
                   type="button"
-                  onClick={() => copyToClipboard(`+${BALAGHAT_GEO.surfaceAltitude.toFixed(1)} m ASL`, "Surface Altitude")}
+                  onClick={() => copyToClipboard(`+${surfaceAltitude.toFixed(1)} m ASL`, "Surface Altitude")}
                   title="Copy Surface Altitude"
                   style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, display: "flex" }}
                 >
@@ -451,32 +410,18 @@ export default function CesiumCutaway() {
                 </button>
               </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
-                +{BALAGHAT_GEO.surfaceAltitude.toFixed(1)} m ASL
+                +{surfaceAltitude.toFixed(1)} m ASL
               </div>
-              <div style={{ fontSize: 10, color: "var(--ink-dim)" }}>
-                Above Sea Level (Collar)
-              </div>
+              <div style={{ fontSize: 10, color: "var(--ink-dim)" }}>Above Sea Level (Collar)</div>
             </div>
 
             {/* COLUMN 4: SUBTERRANEAN ALTITUDE */}
-            <div
-              style={{
-                background: "rgba(20, 21, 15, 0.5)",
-                border: "1px solid var(--glass-border)",
-                borderRadius: 10,
-                padding: "8px 10px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 2,
-              }}
-            >
+            <div style={geoCol}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 10, fontWeight: 600, color: "var(--accent-lime)", letterSpacing: "0.05em" }}>
-                  BOTTOM ALTITUDE
-                </span>
+                <span style={{ ...geoColLabel, color: "var(--accent-lime)" }}>BOTTOM ALTITUDE</span>
                 <button
                   type="button"
-                  onClick={() => copyToClipboard(`${BALAGHAT_GEO.bottomAltitude.toFixed(1)} m BSL`, "Bottom Altitude")}
+                  onClick={() => copyToClipboard(`${bottomAltitude.toFixed(1)} m`, "Bottom Altitude")}
                   title="Copy Bottom Altitude"
                   style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, display: "flex" }}
                 >
@@ -484,65 +429,21 @@ export default function CesiumCutaway() {
                 </button>
               </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: "var(--accent-lime)", fontFamily: "monospace" }}>
-                {BALAGHAT_GEO.bottomAltitude.toFixed(1)} m BSL
+                {bottomAltitude.toFixed(1)} m {bottomAltitude < 0 ? "BSL" : "ASL"}
               </div>
-              <div style={{ fontSize: 10, color: "var(--accent-lime)" }}>
-                Depth: −{BALAGHAT_GEO.depthMeters.toFixed(0)} m
-              </div>
+              <div style={{ fontSize: 10, color: "var(--accent-lime)" }}>Depth: −{depthMeters.toFixed(0)} m</div>
             </div>
           </div>
 
           {/* Perspective Preset Buttons */}
           <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-            <button
-              type="button"
-              onClick={() => flyToPerspective("cutaway")}
-              style={{
-                flex: 1,
-                border: "1px solid var(--glass-border)",
-                borderRadius: 8,
-                padding: "6px 8px",
-                fontSize: 11,
-                fontWeight: 600,
-                background: "rgba(200, 255, 61, 0.12)",
-                color: "var(--accent-lime)",
-                cursor: "pointer",
-              }}
-            >
+            <button type="button" onClick={() => flyToPerspective("cutaway")} style={{ ...perspBtn, background: "rgba(200, 255, 61, 0.12)", color: "var(--accent-lime)" }}>
               <Box size={12} style={{ marginRight: 4, verticalAlign: -2 }} />Isometric
             </button>
-            <button
-              type="button"
-              onClick={() => flyToPerspective("collar")}
-              style={{
-                flex: 1,
-                border: "1px solid var(--glass-border)",
-                borderRadius: 8,
-                padding: "6px 8px",
-                fontSize: 11,
-                fontWeight: 600,
-                background: "rgba(20, 21, 15, 0.4)",
-                color: "var(--ink)",
-                cursor: "pointer",
-              }}
-            >
+            <button type="button" onClick={() => flyToPerspective("collar")} style={perspBtn}>
               <ArrowDown size={12} style={{ marginRight: 4, verticalAlign: -2 }} />Top Collar
             </button>
-            <button
-              type="button"
-              onClick={() => flyToPerspective("subsurface")}
-              style={{
-                flex: 1,
-                border: "1px solid var(--glass-border)",
-                borderRadius: 8,
-                padding: "6px 8px",
-                fontSize: 11,
-                fontWeight: 600,
-                background: "rgba(20, 21, 15, 0.4)",
-                color: "var(--ink)",
-                cursor: "pointer",
-              }}
-            >
+            <button type="button" onClick={() => flyToPerspective("subsurface")} style={perspBtn}>
               <Layers size={12} style={{ marginRight: 4, verticalAlign: -2 }} />Deep Level
             </button>
           </div>
@@ -560,9 +461,12 @@ export default function CesiumCutaway() {
             }}
           >
             <TriangleAlert size={12} style={{ marginRight: 4, verticalAlign: -2 }} />
-            <strong>Illustrative depth callout:</strong> Visualises sourced vertical depth only.
-            Not an engineering mine plan.
+            <strong>Illustrative depth callout:</strong> Visualises an estimated vertical depth,
+            not an engineering mine plan.
           </div>
+          {error && (
+            <div style={{ marginTop: 8, fontSize: 11, color: "var(--critical)" }}>{error}</div>
+          )}
         </GlassCard>
       </div>
 
@@ -602,7 +506,7 @@ export default function CesiumCutaway() {
       {/* Floating Navigation Card (Top-Right) */}
       <div style={{ position: "absolute", top: 20, right: 20, zIndex: 10, display: "flex", gap: 10 }}>
         <Link
-          href="/"
+          href={backHref}
           style={{
             textDecoration: "none",
             display: "inline-flex",
@@ -620,7 +524,7 @@ export default function CesiumCutaway() {
             boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
           }}
         >
-          <ArrowLeft size={13} /> Back to Map View
+          <ArrowLeft size={13} /> {backLabel}
         </Link>
       </div>
 
@@ -636,12 +540,41 @@ export default function CesiumCutaway() {
             color: "var(--ink-dim)",
             fontFamily: "monospace",
             fontSize: 13,
-            zIndex: 50,
+            zIndex: 20,
           }}
         >
-          {error ? `Error: ${error}` : "Initializing Cesium 3D cutaway engine…"}
+          Loading Cesium 3D engine…
         </div>
       )}
     </div>
   );
 }
+
+const geoCol: CSSProperties = {
+  background: "rgba(20, 21, 15, 0.5)",
+  border: "1px solid var(--glass-border)",
+  borderRadius: 10,
+  padding: "8px 10px",
+  display: "flex",
+  flexDirection: "column",
+  gap: 2,
+};
+
+const geoColLabel: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 600,
+  color: "var(--ink-dim)",
+  letterSpacing: "0.05em",
+};
+
+const perspBtn: CSSProperties = {
+  flex: 1,
+  border: "1px solid var(--glass-border)",
+  borderRadius: 8,
+  padding: "6px 8px",
+  fontSize: 11,
+  fontWeight: 600,
+  background: "rgba(20, 21, 15, 0.4)",
+  color: "var(--ink)",
+  cursor: "pointer",
+};
