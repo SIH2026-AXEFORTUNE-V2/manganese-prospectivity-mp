@@ -87,7 +87,24 @@ export default function TopNav({
           Balaghat Cutaway (3D)
         </Link>
         <Link
-          href="/protect"
+          href="/projects/prj_mtbxjq1z_rgxho/plan"
+          style={{
+            textDecoration: "none",
+            borderRadius: 999,
+            padding: "8px 18px",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            background: pathname.includes("/plan") ? "var(--accent-lime)" : "transparent",
+            color: pathname.includes("/plan") ? "var(--chip-dark)" : "var(--ink)",
+            transition: "all 0.18s ease",
+            display: "inline-block",
+          }}
+        >
+          Production Plan
+        </Link>
+        <button
+          type="button"
           onClick={() => onWorkspaceChange("protect")}
           style={{
             textDecoration: "none",
