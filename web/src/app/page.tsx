@@ -27,6 +27,7 @@ export default function Home() {
   // Which centerpiece fills the map area: the breathing globe or the georeferenced
   // belt map. Globe is the default; the switch below flips it.
   const [view, setView] = useState<"globe" | "map">("globe");
+  const [selectedRank, setSelectedRank] = useState<number | null>(null);
   const { status, error, manifest, targets, mines, validation } = useOreCompassData();
 
   return (
@@ -124,7 +125,7 @@ export default function Home() {
         {/* Ranked-target rail, bottom - one card per target, ScoreRing for its fused score. */}
         {status === "ready" && targets && (
           <div style={{ position: "absolute", left: 20, right: 20, bottom: 20 }}>
-            <TargetRail targets={targets} />
+            <TargetRail targets={targets} selectedRank={selectedRank} onSelect={setSelectedRank} />
           </div>
         )}
       </main>

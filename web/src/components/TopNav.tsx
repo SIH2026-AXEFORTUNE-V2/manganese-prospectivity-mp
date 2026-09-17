@@ -121,7 +121,7 @@ export default function TopNav({
           }}
         >
           Protect
-        </Link>
+        </button>
       </div>
 
       <ThemeToggle />
